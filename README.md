@@ -1,6 +1,5 @@
 # iminurvm
 
-"im in ur VM, uzin ur GPU" wurde dein Prozess oder Container von jemand anderem gekillt? Blöd... dann claime deine GPU mit iminurvm!
 **Ownership & visibility for shared GPU VMs on Proxmox** (project name: gpu-board).
 
 ## Context
