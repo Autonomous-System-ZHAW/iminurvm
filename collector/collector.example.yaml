@@ -1,0 +1,30 @@
+# Copy to /etc/gpuboard/collector.yaml
+poll_interval_seconds: 30
+status_path: /var/lib/gpuboard/status.json
+listen_host: 0.0.0.0
+listen_port: 8080
+
+ssh_user: gpuboard
+ssh_key: /etc/gpuboard/id_ed25519
+ssh_timeout_seconds: 10
+agent_command: vm-agent
+
+proxmox:
+  nodes:
+    - name: pve-a
+      host: pve-a.example.org
+      token_id: gpuboard@pve!readonly      # role: PVEAuditor
+      token_secret_file: /etc/gpuboard/pve-a.token
+      verify_ssl: true
+    - name: pve-b
+      host: pve-b.example.org
+      token_id: gpuboard@pve!readonly
+      token_secret_file: /etc/gpuboard/pve-b.token
+      verify_ssl: true
+
+# vmid -> SSH address, if the VM name is not resolvable
+vm_addresses:
+  101: gpu-101.example.org
+  102: gpu-102.example.org
+  201: gpu-201.example.org
+  202: gpu-202.example.org

@@ -1,0 +1,4 @@
+# Append to /etc/pam.d/sshd (optional; remove the line to disable).
+# The hook never fails a login. It is also switched off by
+# `pam_auto_claim_enabled: false` in agent.yaml.
+session optional pam_exec.so quiet /usr/local/bin/vm-pam-hook

@@ -1,0 +1,5 @@
+---
+# TODO(phase 3/4): venv, collector.yaml, token files, systemd unit
+- name: Placeholder
+  ansible.builtin.debug:
+    msg: "collector role not implemented yet"

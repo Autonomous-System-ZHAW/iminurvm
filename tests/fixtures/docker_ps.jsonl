@@ -1,0 +1,2 @@
+{"ID":"3f4a9c1b2d7e","Names":"isaac-sim-alice","Image":"nvcr.io/nvidia/isaac-sim:4.5.0","Status":"Up 2 hours","Labels":"owner=alice,project=isaac-demo,com.docker.compose.service=isaac"}
+{"ID":"9a8b7c6d5e4f","Names":"gazebo-bob","Image":"osrf/ros:jazzy-desktop","Status":"Up 5 minutes","Labels":""}

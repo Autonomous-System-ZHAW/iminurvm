@@ -1,0 +1,6 @@
+---
+# TODO(phase 4): install package, agent.yaml, profile.d MOTD shim, cleanup timer,
+# optional PAM snippet (toggle variable), SSH key for the collector user
+- name: Placeholder
+  ansible.builtin.debug:
+    msg: "vm-agent role not implemented yet"

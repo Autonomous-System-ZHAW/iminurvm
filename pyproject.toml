@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpu-board"
+version = "0.1.0"
+description = "Ownership & visibility for shared GPU VMs on Proxmox"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6"]
+
+[project.optional-dependencies]
+collector = ["proxmoxer>=2", "requests>=2.31", "Jinja2>=3.1"]
+dev = ["pytest>=8", "ruff>=0.6", "black>=24"]
+
+[project.scripts]
+vm-agent = "gpuboard_agent.main:main"
+vm-claim = "gpuboard_agent.cli.claim:main"
+vm-extend = "gpuboard_agent.cli.extend:main"
+vm-release = "gpuboard_agent.cli.release:main"
+vm-status = "gpuboard_agent.cli.status:main"
+vm-run = "gpuboard_agent.cli.run:main"
+sim-start = "gpuboard_agent.cli.sim:start_main"
+sim-stop = "gpuboard_agent.cli.sim:stop_main"
+vm-motd = "gpuboard_agent.motd:main"
+vm-pam-hook = "gpuboard_agent.pam_hook:main"
+vm-cleanup = "gpuboard_agent.cleanup:main"
+gpu-board-collector = "gpuboard_collector.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gpuboard_*"]
+
+[tool.setuptools.package-data]
+gpuboard_collector = ["templates/*.j2"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "D", "ANN"]
+ignore = ["D203", "D213", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "ANN"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

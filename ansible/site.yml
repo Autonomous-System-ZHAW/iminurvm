@@ -1,0 +1,15 @@
+---
+- name: Accounts and claim group on GPU VMs
+  hosts: gpu_vms
+  become: true
+  roles: [accounts]
+
+- name: Agent, CLI, MOTD (and optional PAM hook) on GPU VMs
+  hosts: gpu_vms
+  become: true
+  roles: [vm-agent]
+
+- name: Collector and dashboard
+  hosts: collector
+  become: true
+  roles: [collector]

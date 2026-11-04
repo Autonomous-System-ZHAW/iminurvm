@@ -1,0 +1,16 @@
+---
+all:
+  children:
+    proxmox_nodes:
+      hosts:
+        pve-a: {ansible_host: pve-a.example.org}
+        pve-b: {ansible_host: pve-b.example.org}
+    gpu_vms:
+      hosts:
+        gpu-101: {ansible_host: gpu-101.example.org, pve_node: pve-a, vmid: 101}  # RTX PRO 6000
+        gpu-102: {ansible_host: gpu-102.example.org, pve_node: pve-a, vmid: 102}  # RTX 5090
+        gpu-201: {ansible_host: gpu-201.example.org, pve_node: pve-b, vmid: 201}  # RTX A5000
+        gpu-202: {ansible_host: gpu-202.example.org, pve_node: pve-b, vmid: 202}  # RTX A4000
+    collector:
+      hosts:
+        gpu-board: {ansible_host: gpu-board.example.org}

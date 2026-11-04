@@ -1,0 +1,12 @@
+[Unit]
+Description=gpu-board collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=gpuboard
+ExecStart=/opt/gpuboard/venv/bin/gpu-board-collector --config /etc/gpuboard/collector.yaml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
