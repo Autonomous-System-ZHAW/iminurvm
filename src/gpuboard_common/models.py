@@ -78,7 +78,7 @@ class GpuProcess:
     name: str = ""
     gpu_memory_mib: int | None = None
     gpu_uuid: str | None = None
-    container_id: int | None = None
+    container_id: str | None = None
     container: str | None = None
     container_owner: str | None = None
     container_project: str | None = None

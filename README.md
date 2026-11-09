@@ -97,6 +97,6 @@ make install   # pip install -e ".[collector,dev]"
 make fmt lint test
 ```
 
-Status: **early development**. Status and claim-file logic are implemented;
-login session collection is in progress. Most agent and collector components
-are still stubs. See the [roadmap](docs/ROADMAP.md).
+Status: **early development**. Status and claim-file logic and the initial
+agent snapshot are implemented; VM validation and most collector components
+remain. See the [roadmap](docs/ROADMAP.md).

@@ -38,6 +38,29 @@ unavailable results and use a short timeout so login is not held up; they may
 show the local claim separately, without presenting it as a collector status.
 Status freshness thresholds and the snapshot transport have not been decided.
 
+## Agent snapshot
+
+Run `vm-agent` for one JSON snapshot, or `vm-agent --config /path/agent.yaml`
+to select a config. The optional default path is `/etc/gpuboard/agent.yaml`;
+an explicitly selected missing file is an error. Configuration must be a YAML
+mapping containing only the keys in `agent/agent.example.yaml`. Claim paths
+must be absolute; durations must be finite and positive, except an idle grace
+of zero is allowed. Existing defaults apply when a setting is omitted.
+
+The JSON contract has `schema_version: 1`, `hostname`, `collected_at`,
+`gpu_model`, `sessions`, `gpu_processes`, `containers`, and `claim`.
+Timestamps include UTC offsets, optional fields use `null`, and collections
+are arrays. `claim` is the latest local claim or `null`. The reader rejects
+unknown schema versions, missing fields and invalid data. `hostname` is an
+observation, not a verified Proxmox VM identity; stable mapping and
+authentication remain collector-side design work.
+
+The agent collects its sources sequentially, so the snapshot is not atomic.
+The collection timestamp is recorded after collection, not at each individual
+observation. Source failures cause a nonzero exit and an error on stderr,
+without emitting a partial snapshot. Docker and NVIDIA tools, logind, and
+adequate permissions are required. A missing claim file means no claim.
+
 ## Login session collection
 
 The agent's `list_login_sessions()` uses `loginctl list-sessions`, followed by
@@ -61,6 +84,36 @@ free. With SSH pull, the
 collector's own SSH login may appear as a session; filtering service accounts
 and handling that self-observation still need a design before status collection
 is integrated.
+
+## Docker observation
+
+The agent lists running containers using `docker ps`, then uses `docker inspect`
+to obtain exact labels, including values containing commas. Docker CLI and
+daemon errors are reported rather than interpreted as an empty container list.
+If a container stops or disappears during collection, that collection fails
+and should be retried by the caller. Cgroup mapping recognizes Docker
+systemd scopes and `/docker/<id>` paths; it does not identify other runtimes.
+Only running Docker containers are listed.
+
+The agent needs Docker API access to list and inspect containers. Membership in
+the Docker socket group effectively grants root-level control of the host;
+do not grant it casually to all users. An appropriately restricted Docker API
+proxy or a dedicated privileged collection mechanism needs to be evaluated
+before deployment.
+
+## GPU observation
+
+The GPU collector uses `nvidia-smi` to query the model and **compute**
+processes, then resolves each PID's effective Linux user with `ps` and maps
+its `/proc/<pid>/cgroup` against the supplied Docker inventory. It records
+container labels when a Docker match exists; Docker IDs are strings.
+Processes that disappear during collection and recognized containers missing
+from the inventory cause a collection error, not an idle result. Collection
+is not atomic: processes may exit or PIDs may be reused between commands.
+Unrecognized container runtime cgroup layouts are not attributed to Docker.
+The query does not cover graphics-only processes, GPU utilization, or
+containers that have no GPU compute process. Agent snapshot integration
+remains to be implemented.
 
 ## Permissions model
 
