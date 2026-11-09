@@ -97,5 +97,6 @@ make install   # pip install -e ".[collector,dev]"
 make fmt lint test
 ```
 
-Status: **phase 0 (skeleton)**. Only `status.py` and `claimfile.py` are
-implemented; everything else is stubbed. See the [roadmap](docs/ROADMAP.md).
+Status: **early development**. Status and claim-file logic are implemented;
+login session collection is in progress. Most agent and collector components
+are still stubs. See the [roadmap](docs/ROADMAP.md).

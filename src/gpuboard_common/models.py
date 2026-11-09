@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Literal
 
 ClaimKind = Literal["manual", "auto", "run"]
-SessionKind = Literal["ssh", "vscode", "local"]
+SessionKind = Literal["ssh", "vscode", "local", "remote"]
 
 
 class VmStatus(StrEnum):
@@ -39,7 +39,7 @@ class Claim:
 
 @dataclass(frozen=True)
 class Session:
-    """A logged-in user session (loginctl/who) or a VS Code Remote session."""
+    """A login session or a VS Code process signal, not a confirmed connection."""
 
     user: str
     kind: SessionKind = "ssh"

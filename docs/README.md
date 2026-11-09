@@ -38,6 +38,30 @@ unavailable results and use a short timeout so login is not held up; they may
 show the local claim separately, without presenting it as a collector status.
 Status freshness thresholds and the snapshot transport have not been decided.
 
+## Login session collection
+
+The agent's `list_login_sessions()` uses `loginctl list-sessions`, followed by
+`loginctl show-session` for each session. It reports user-class sessions,
+excluding greeters and other system classes. The PAM service identifies SSH
+sessions; other remotely marked sessions are labeled `remote`, and the rest
+are labeled `local`. Start times are stored in UTC. Command failures,
+malformed output and sessions that disappear during collection are reported
+as errors, not treated as an empty session list.
+
+This currently requires systemd-logind; there is no `who` fallback.
+`find_vscode_users()` also scans process executable and script paths under
+`.vscode-server` or `.vscode-server-insiders`, using numeric process owners
+to resolve user names. Its results are a best-effort activity signal, not proof
+of an active connection: processes can linger after a disconnect, and procfs
+permissions can limit visibility. `merge_vscode_sessions()` keeps login
+sessions intact and adds one `vscode` entry per detected user; this entry is a
+process signal, not a confirmed login. The current status rules count that
+entry as activity, so a lingering process can prevent a VM from appearing
+free. With SSH pull, the
+collector's own SSH login may appear as a session; filtering service accounts
+and handling that self-observation still need a design before status collection
+is integrated.
+
 ## Permissions model
 
 Only writing the claim needs more than user rights. Simplest sound option:

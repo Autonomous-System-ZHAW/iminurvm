@@ -78,6 +78,11 @@ def test_unclaimed_usage_session() -> None:
     )
 
 
+def test_vscode_process_signal_counts_as_unclaimed_usage() -> None:
+    snap = make_snapshot(sessions=(Session(user="alice", kind="vscode"),))
+    assert derive_status(snap, NOW) is VmStatus.UNCLAIMED_USAGE
+
+
 def test_unclaimed_usage_gpu() -> None:
     snap = make_snapshot(gpu_processes=(GpuProcess(pid=5, user="bob"),))
     assert derive_status(snap, NOW) is VmStatus.UNCLAIMED_USAGE

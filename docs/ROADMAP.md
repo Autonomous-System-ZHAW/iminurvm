@@ -5,7 +5,9 @@ Phase 0 (this scaffold): layout, tooling, models, `status.py`, `claimfile.py`.
 ## Phase 1 — agent collectors on a single VM
 
 1. Define a versioned snapshot JSON contract and stable VM identity mapping
-2. `sessions.py` (`loginctl`/`who`, `.vscode-server` detection)
+2. `sessions.py`: logind collection, VS Code process detection and merging
+   implemented; integrate with the agent and handle collector SSH
+   self-observation
 3. `docker.py` (`docker ps` JSON, cgroup → container, labels)
 4. `gpu.py` (`nvidia-smi` CSV, PID → user)
 5. `serialize.py` snapshot (de)serialization, `config.py`, `main.py` (`vm-agent`)
