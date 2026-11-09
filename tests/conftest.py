@@ -48,7 +48,6 @@ def make_snapshot(
     claim: Claim | None = None,
     sessions: tuple[Session, ...] = (),
     gpu_processes: tuple[GpuProcess, ...] = (),
-    **kwargs: object,
 ) -> VmSnapshot:
     """Snapshot with sensible defaults."""
     return VmSnapshot(
@@ -57,5 +56,4 @@ def make_snapshot(
         claim=claim,
         sessions=sessions,
         gpu_processes=gpu_processes,
-        **kwargs,  # type: ignore[arg-type]
     )

@@ -10,7 +10,11 @@ from gpuboard_common.models import BoardState, VmEntry, VmInventory, VmSnapshot
 def build_entry(
     vm: VmInventory, result: VmSnapshot | Exception | None, now: datetime
 ) -> VmEntry:
-    """Build one board row; stopped VMs are OFF, failed pulls UNREACHABLE."""
+    """Build a row and derive status from inventory and the current pull result.
+
+    A stopped VM or failed pull has no current snapshot; preserve pull errors
+    in the entry rather than treating missing data as an idle VM.
+    """
     raise NotImplementedError  # TODO(phase 3)
 
 

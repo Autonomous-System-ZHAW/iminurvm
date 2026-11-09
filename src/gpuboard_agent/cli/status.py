@@ -10,7 +10,9 @@ from gpuboard_agent.cli._common import add_config_argument, not_implemented
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser."""
     parser = argparse.ArgumentParser(prog="vm-status", description="Show VM status.")
-    parser.add_argument("--json", action="store_true", help="print the raw snapshot")
+    parser.add_argument(
+        "--json", action="store_true", help="print the collector status"
+    )
     add_config_argument(parser)
     return parser
 
@@ -18,4 +20,4 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Entry point for ``vm-status``."""
     build_parser().parse_args(argv)
-    return not_implemented("vm-status")  # TODO(phase 1)
+    return not_implemented("vm-status")  # TODO(phase 3)

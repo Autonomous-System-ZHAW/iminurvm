@@ -1,9 +1,16 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
-from gpuboard_common.models import Container, GpuProcess, Session, VmStatus
-from gpuboard_common.status import derive_status
+from gpuboard_common.models import (
+    Container,
+    GpuProcess,
+    Session,
+    VmInventory,
+    VmSnapshot,
+    VmStatus,
+)
+from gpuboard_common.status import derive_status as derive_collector_status
 from tests.conftest import NOW, make_claim, make_snapshot
 
 ALICE = Session(user="alice")
@@ -11,19 +18,23 @@ BOB = Session(user="bob")
 EXPIRED = {"start": timedelta(hours=-5), "end": timedelta(hours=-1)}
 
 
+def derive_status(snapshot: VmSnapshot, now: datetime) -> VmStatus:
+    inventory = VmInventory(vmid=101, name="gpu-101", node="pve-a", running=True)
+    return derive_collector_status(inventory, snapshot, now)
+
+
 def test_free() -> None:
     assert derive_status(make_snapshot(), NOW) is VmStatus.FREE
 
 
 def test_stopped_vm_is_off() -> None:
-    snap = make_snapshot(sessions=(ALICE,), vm_running=False)
-    assert derive_status(snap, NOW) is VmStatus.OFF_UNREACHABLE
+    inventory = VmInventory(vmid=101, name="gpu-101", node="pve-a", running=False)
+    assert derive_collector_status(inventory, None, NOW) is VmStatus.OFF_UNREACHABLE
 
 
 def test_unreachable_agent() -> None:
-    assert (
-        derive_status(make_snapshot(reachable=False), NOW) is VmStatus.OFF_UNREACHABLE
-    )
+    inventory = VmInventory(vmid=101, name="gpu-101", node="pve-a", running=True)
+    assert derive_collector_status(inventory, None, NOW) is VmStatus.OFF_UNREACHABLE
 
 
 def test_claimed_without_usage() -> None:
@@ -107,8 +118,9 @@ def test_planned_claim_is_ignored_for_status() -> None:
 
 
 def test_off_wins_over_claim() -> None:
-    snap = make_snapshot(make_claim(), vm_running=False)
-    assert derive_status(snap, NOW) is VmStatus.OFF_UNREACHABLE
+    inventory = VmInventory(vmid=101, name="gpu-101", node="pve-a", running=False)
+    snap = make_snapshot(make_claim())
+    assert derive_collector_status(inventory, snap, NOW) is VmStatus.OFF_UNREACHABLE
 
 
 def test_container_labels() -> None:

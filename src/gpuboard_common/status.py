@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from gpuboard_common.claimfile import is_active, is_expired
-from gpuboard_common.models import VmSnapshot, VmStatus
+from gpuboard_common.models import VmInventory, VmSnapshot, VmStatus
 
 
 def users_with_activity(snapshot: VmSnapshot) -> set[str]:
@@ -15,12 +15,14 @@ def users_with_activity(snapshot: VmSnapshot) -> set[str]:
     return users
 
 
-def derive_status(snapshot: VmSnapshot, now: datetime) -> VmStatus:
-    """Derive the VM status from one snapshot.
+def derive_status(
+    inventory: VmInventory, snapshot: VmSnapshot | None, now: datetime
+) -> VmStatus:
+    """Derive status from collector inventory and an optional agent snapshot.
 
     Rules, in order:
 
-    1. VM stopped or agent unreachable -> ``OFF_UNREACHABLE``.
+    1. VM stopped or no agent snapshot available -> ``OFF_UNREACHABLE``.
     2. Active claim: GPU process of another user -> ``CONFLICT``, else
        ``CLAIMED`` (foreign SSH sessions alone are only a warning).
     3. Expired claim: owner still active -> ``CLAIM_EXPIRED``; only others
@@ -30,7 +32,7 @@ def derive_status(snapshot: VmSnapshot, now: datetime) -> VmStatus:
 
     ``now`` must be timezone-aware.
     """
-    if not snapshot.reachable or not snapshot.vm_running:
+    if not inventory.running or snapshot is None:
         return VmStatus.OFF_UNREACHABLE
 
     users = users_with_activity(snapshot)

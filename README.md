@@ -40,14 +40,33 @@ The precise rules live in [`status.py`](src/gpuboard_common/status.py).
 │ VM 101  [agent]              │   │ VM 201  [agent]              │
 │ VM 102  [agent]              │   │ VM 202  [agent]              │
 └──────────────┬───────────────┘   └──────────────┬───────────────┘
-               │ Proxmox API (read-only token)     │ SSH pull every ~30 s
+               │ Proxmox inventory                 │ agent snapshots
                ▼                                   ▼
         ┌──────────── Collector (small LXC / VM "gpu-board") ─────────┐
-        │  merge: Proxmox inventory + agent state + claims            │
+        │  merge inventory + snapshots; derive status centrally       │
         │  → status.json → web dashboard (single page, auto-refresh)  │
         │  → /metrics (Prometheus text format, prepared, optional)    │
         └─────────────────────────────────────────────────────────────┘
+                           │ read-only status endpoint
+                           ▼
+                  VM: vm-status / login banner
 ```
+
+The agent collects a point-in-time snapshot of all users' sessions, GPU
+processes, containers and the local claim. It does not derive VM status.
+Proxmox supplies the collector with the VM's running state; a missing
+successful snapshot indicates that the agent is unavailable. The collector
+combines these inputs to derive status. The VM's `claim.json` remains the
+source of truth for claims; the collector's claim is its latest observation.
+
+SSH pull every 30 seconds is the original transport plan, not an implemented
+feature. HTTP push or MQTT are alternatives still under consideration. A push
+design would require a background service on each VM; the original SSH agent
+would run only when invoked. Regardless of transport, the planned VM status
+and MOTD clients read the collector's status, displaying its observation time
+and clearly reporting stale or unavailable data rather than presenting it as
+current. A local claim change may not appear until the collector receives the
+next snapshot.
 
 ## Team rules
 
@@ -67,7 +86,6 @@ The precise rules live in [`status.py`](src/gpuboard_common/status.py).
 | `src/gpuboard_agent/` | `vm-agent`, CLI, MOTD, PAM hook (stdlib + PyYAML) |
 | `src/gpuboard_collector/` | collector service and dashboard |
 | `agent/`, `cli/`, `motd/`, `pam/`, `collector/` | deployable assets, examples |
-| `ansible/` | rollout skeleton |
 | `docs/` | [documentation](docs/README.md), [roadmap](docs/ROADMAP.md) |
 | `tests/` | pytest suite with fixtures |
 
@@ -81,4 +99,3 @@ make fmt lint test
 
 Status: **phase 0 (skeleton)**. Only `status.py` and `claimfile.py` are
 implemented; everything else is stubbed. See the [roadmap](docs/ROADMAP.md).
-

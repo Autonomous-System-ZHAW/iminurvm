@@ -14,14 +14,29 @@ architecture diagram and the **team rules**.
    (this also covers VS Code Remote terminals).
 6. Optional: append `pam/sshd.snippet` to `/etc/pam.d/sshd`. Disable via
    `pam_auto_claim_enabled: false` or by removing the line.
-7. Create an unprivileged `gpuboard` user for the collector's SSH pull; it only
-   needs to run `vm-agent`.
+7. If using SSH pull, create an unprivileged `gpuboard` user for the collector;
+   it only needs to run `vm-agent`. The transport is still under consideration.
 8. Collector host: `pip install ".[collector]"`, copy
    `collector/collector.example.yaml` and
    `collector/gpu-board-collector.service`.
 9. Proxmox: create an API token with the `PVEAuditor` role per node.
 
-All of this is automated by `ansible/`.
+## Data ownership and status
+
+The VM agent collects a snapshot of local facts, including the local claim.
+The collector owns Proxmox inventory, determines whether a current snapshot
+was received, and derives the VM status. `VmInventory.running` represents
+Proxmox's running state; a missing snapshot is not the same as an idle VM.
+Stopped or unavailable VMs get `OFF_UNREACHABLE`, even if an old snapshot
+exists. `VmEntry` combines inventory, the current snapshot when available,
+the derived status and any collection error.
+
+The planned `vm-status` and MOTD clients display the collector's latest
+observations and derived status, with a collection timestamp. A local claim
+change can take time to reach the collector. Clients must indicate stale or
+unavailable results and use a short timeout so login is not held up; they may
+show the local claim separately, without presenting it as a collector status.
+Status freshness thresholds and the snapshot transport have not been decided.
 
 ## Permissions model
 

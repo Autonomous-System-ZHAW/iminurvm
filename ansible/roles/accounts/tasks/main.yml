@@ -1,5 +1,0 @@
----
-# TODO(phase 4): personal accounts, `vm-claim` group, /var/lib/gpuboard (2775 root:vm-claim)
-- name: Placeholder
-  ansible.builtin.debug:
-    msg: "accounts role not implemented yet"

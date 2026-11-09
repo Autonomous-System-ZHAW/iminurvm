@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from gpuboard_common.models import VmSnapshot
+from gpuboard_common.models import VmEntry, VmSnapshot
 
 
-def render_motd(snapshot: VmSnapshot, login_user: str, now: datetime) -> str:
-    """Render claim, users, GPU usage and a warning for non-owners."""
-    raise NotImplementedError  # TODO(phase 1)
+def render_motd(entry: VmEntry, login_user: str, now: datetime) -> str:
+    """Render collector-derived status, observed claim, users and warnings."""
+    raise NotImplementedError  # TODO(phase 3)
 
 
 def handover_warning(snapshot: VmSnapshot, now: datetime) -> str | None:
@@ -19,4 +19,4 @@ def handover_warning(snapshot: VmSnapshot, now: datetime) -> str | None:
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point for ``vm-motd``."""
-    raise NotImplementedError  # TODO(phase 1)
+    raise NotImplementedError  # TODO(phase 3)

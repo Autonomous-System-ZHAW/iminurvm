@@ -78,6 +78,7 @@ class GpuProcess:
     name: str = ""
     gpu_memory_mib: int | None = None
     gpu_uuid: str | None = None
+    container_id: int | None = None
     container: str | None = None
     container_owner: str | None = None
     container_project: str | None = None
@@ -93,7 +94,7 @@ class GpuProcess:
 
 @dataclass(frozen=True)
 class VmSnapshot:
-    """Everything the agent (plus the collector) knows about one VM."""
+    """Point-in-time observations reported by the VM agent."""
 
     hostname: str
     collected_at: datetime
@@ -102,13 +103,11 @@ class VmSnapshot:
     gpu_processes: tuple[GpuProcess, ...] = ()
     containers: tuple[Container, ...] = ()
     claim: Claim | None = None
-    vm_running: bool = True
-    reachable: bool = True
 
 
 @dataclass(frozen=True)
 class VmInventory:
-    """A VM as reported by the Proxmox API."""
+    """Collector-owned VM inventory, including Proxmox's running state."""
 
     vmid: int
     name: str
@@ -120,7 +119,7 @@ class VmInventory:
 
 @dataclass(frozen=True)
 class VmEntry:
-    """One row of the board: inventory + snapshot + derived status."""
+    """Collector-owned board row, with a snapshot only if the pull succeeded."""
 
     inventory: VmInventory
     status: VmStatus
