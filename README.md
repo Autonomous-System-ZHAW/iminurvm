@@ -100,3 +100,5 @@ make fmt lint test
 Status: **early development**. Status and claim-file logic and the initial
 agent snapshot are implemented; VM validation and most collector components
 remain. See the [roadmap](docs/ROADMAP.md).
+
+# Geschrieben mit Codey 💖
