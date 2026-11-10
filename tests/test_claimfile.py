@@ -1,6 +1,8 @@
 import json
-from datetime import timedelta
+from dataclasses import replace
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -118,6 +120,18 @@ def test_remaining() -> None:
     claim = make_claim(end=timedelta(hours=2))
     assert remaining(claim, NOW) == timedelta(hours=2)
     assert remaining(claim, NOW + timedelta(hours=3)) == timedelta(hours=-1)
+
+
+def test_claim_helpers_during_clock_change() -> None:
+    zone = ZoneInfo("Europe/Zurich")
+    start = datetime(2026, 10, 25, 2, 45, tzinfo=zone, fold=0)
+    end = datetime(2026, 10, 25, 2, 45, tzinfo=zone, fold=1)
+    claim = replace(make_claim(), start=start, end=end)
+    halfway = datetime(2026, 10, 25, 2, 15, tzinfo=zone, fold=1)
+    assert is_active(claim, halfway)
+    assert remaining(claim, halfway) == timedelta(minutes=30)
+    assert not is_cleanup_due(claim, halfway, timedelta(0))
+    assert is_expired(claim, end)
 
 
 def test_cleanup_due() -> None:

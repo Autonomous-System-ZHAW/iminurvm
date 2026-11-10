@@ -135,6 +135,9 @@ Only writing the claim needs more than user rights. Simplest sound option:
 - `claim.json` is mode `0664`, group `vm-claim`.
 - Writes are atomic (temp file in the same directory + rename), so the
   directory must be group-writable.
+- Claim commands coordinate through a persistent group-writable lock file in
+  the same directory; all claim writers must acquire it before reading and
+  modifying a claim. This is cooperative, not access control.
 - No sticky bit: anybody may extend or release a claim (this is a social
   system; `vm-release` of a foreign claim requires `--force`).
 - The PAM hook runs as root; everything else runs unprivileged.

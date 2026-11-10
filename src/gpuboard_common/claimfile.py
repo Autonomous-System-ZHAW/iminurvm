@@ -6,7 +6,7 @@ import json
 import os
 import tempfile
 from collections.abc import Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast, get_args
 
@@ -19,6 +19,12 @@ _REQUIRED = ("owner", "project", "start", "end", "kind", "created_by", "created_
 
 class ClaimError(ValueError):
     """Raised when a claim file or dict is malformed."""
+
+
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamp without UTC offset")
+    return value.astimezone(UTC)
 
 
 def claim_from_dict(data: Mapping[str, Any]) -> Claim:
@@ -65,7 +71,7 @@ def validate_claim(claim: Claim) -> None:
         raise ClaimError("owner must not be empty")
     if claim.kind not in CLAIM_KINDS:
         raise ClaimError(f"invalid kind: {claim.kind!r}")
-    if claim.end <= claim.start:
+    if _utc(claim.end) <= _utc(claim.start):
         raise ClaimError("end must be after start")
     if claim.kind == "run" and claim.pid is None:
         raise ClaimError("kind 'run' requires a pid")
@@ -108,12 +114,12 @@ def delete_claim(path: Path) -> None:
 
 def is_planned(claim: Claim, now: datetime) -> bool:
     """True if the claim starts in the future (future reservations)."""
-    return now < claim.start
+    return _utc(now) < _utc(claim.start)
 
 
 def is_expired(claim: Claim, now: datetime) -> bool:
     """True once ``end`` has been reached."""
-    return now >= claim.end
+    return _utc(now) >= _utc(claim.end)
 
 
 def is_active(claim: Claim, now: datetime) -> bool:
@@ -123,7 +129,7 @@ def is_active(claim: Claim, now: datetime) -> bool:
 
 def remaining(claim: Claim, now: datetime) -> timedelta:
     """Time left until ``end``; negative once expired."""
-    return claim.end - now
+    return _utc(claim.end) - _utc(now)
 
 
 def is_cleanup_due(claim: Claim, now: datetime, grace: timedelta) -> bool:
@@ -132,4 +138,4 @@ def is_cleanup_due(claim: Claim, now: datetime, grace: timedelta) -> bool:
     The caller must additionally check that the VM is idle (no sessions or
     GPU processes) before deleting the claim.
     """
-    return now >= claim.end + grace
+    return _utc(now) >= _utc(claim.end) + grace

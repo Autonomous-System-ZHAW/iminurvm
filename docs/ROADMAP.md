@@ -12,14 +12,17 @@ Phase 0 (this scaffold): layout, tooling, models, `status.py`, `claimfile.py`.
    decide restricted Docker API access
 4. `gpu.py` implemented: `nvidia-smi` compute CSV, PID user and Docker mapping
 5. `serialize.py` snapshot (de)serialization, `config.py`, `main.py` (`vm-agent`)
-   implemented; validate on a GPU VM with real containers and remote sessions
+   implemented; initial GPU VM test covered containers and remote sessions.
+   Labeled-container and test-claim validation remain.
 
 ## Phase 2 — claim commands and cleanup
 
-1. `parse_duration`, `vm-claim`, `vm-extend`, `vm-release`
-2. `vm-run` (`kind: run`, auto-release on exit)
-3. `sim-start` / `sim-stop` label wrappers
-4. `cleanup.py` + systemd timer (idle grace period)
+1. `parse_duration`, `vm-claim`, `vm-extend`, `vm-release` implemented;
+   validate on a VM
+2. `cleanup.py` + systemd timer (idle grace period)
+
+The basic claim workflow and cleanup are the priority. Process-bound claims
+and simulation wrappers are deferred as optional enhancements.
 
 ## Phase 3 — collector and dashboard
 
@@ -43,3 +46,5 @@ Phase 0 (this scaffold): layout, tooling, models, `status.py`, `claimfile.py`.
    warning 40 min before)
 2. OIDC authentication (Pocket ID)
 3. Claim button in the dashboard
+4. `vm-run` (`kind: run`, auto-release on exit)
+5. `sim-start` / `sim-stop` label wrappers
