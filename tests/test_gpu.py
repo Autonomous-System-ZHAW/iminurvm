@@ -1,3 +1,4 @@
+import pwd
 import subprocess
 from pathlib import Path
 from unittest.mock import Mock
@@ -102,7 +103,7 @@ def test_command_failure_propagates(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_resolve_process_user(monkeypatch: pytest.MonkeyPatch) -> None:
     run = Mock(return_value=completed("1001\n"))
     monkeypatch.setattr(gpu.subprocess, "run", run)
-    monkeypatch.setattr(gpu.pwd, "getpwuid", Mock(return_value=Mock(pw_name="alice")))
+    monkeypatch.setattr(pwd, "getpwuid", Mock(return_value=Mock(pw_name="alice")))
     assert gpu.resolve_process_user(42) == "alice"
     run.assert_called_once_with(
         ["ps", "-p", "42", "-o", "euid="],
@@ -111,6 +112,24 @@ def test_resolve_process_user(monkeypatch: pytest.MonkeyPatch) -> None:
         check=True,
         timeout=10,
     )
+
+
+def test_resolve_unmapped_process_user(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(gpu.subprocess, "run", Mock(return_value=completed("1234\n")))
+    monkeypatch.setattr(pwd, "getpwuid", Mock(side_effect=KeyError(1234)))
+    assert gpu.resolve_process_user(42) == "uid:1234"
+    assert "1234" in caplog.text
+
+
+def test_unexpected_uid_lookup_error_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gpu.subprocess, "run", Mock(return_value=completed("1234\n")))
+    monkeypatch.setattr(pwd, "getpwuid", Mock(side_effect=OSError("lookup failed")))
+    with pytest.raises(OSError, match="lookup failed"):
+        gpu.resolve_process_user(42)
 
 
 @pytest.mark.parametrize("output", ["", "bob\n", "1000\n1001\n", "-1"])
@@ -151,6 +170,21 @@ def test_list_gpu_processes_with_container(monkeypatch: pytest.MonkeyPatch) -> N
     ]
     assert result[0].effective_owner == "alice"
     assert read.call_count == 2
+
+
+@pytest.mark.parametrize("owner", [None, "alice"])
+def test_unmapped_container_process(
+    monkeypatch: pytest.MonkeyPatch, owner: str | None
+) -> None:
+    monkeypatch.setattr(gpu, "query_compute_apps", lambda: f"42, kit, {UUID}, 4451\n")
+    monkeypatch.setattr(gpu.subprocess, "run", Mock(return_value=completed("1234\n")))
+    monkeypatch.setattr(pwd, "getpwuid", Mock(side_effect=KeyError(1234)))
+    monkeypatch.setattr(gpu.Path, "read_text", Mock(return_value=f"0::/docker/{ID}\n"))
+    labels = {"owner": owner} if owner else {}
+    process = gpu.list_gpu_processes([Container(ID, "sim", labels=labels)])[0]
+    assert process.user == "uid:1234"
+    assert process.container == "sim"
+    assert process.effective_owner == (owner or "uid:1234")
 
 
 def test_missing_container_fails(monkeypatch: pytest.MonkeyPatch) -> None:

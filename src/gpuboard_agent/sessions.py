@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
-import pwd
 import re
 import subprocess
 from datetime import UTC, datetime
 
+from gpuboard_agent.users import username_for_uid
 from gpuboard_common.models import Session, SessionKind
 
 _SESSION_ID = re.compile(r"[A-Za-z0-9]+")
@@ -131,7 +131,7 @@ def find_vscode_users() -> set[str]:
             is_server = len(args) > 1 and bool(_VSCODE_SERVER_PATH.search(args[1]))
         if is_server:
             uids.add(int(columns[0]))
-    return {pwd.getpwuid(uid).pw_name for uid in uids}
+    return {username_for_uid(uid) for uid in uids}
 
 
 def merge_vscode_sessions(

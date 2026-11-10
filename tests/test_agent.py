@@ -1,4 +1,5 @@
 import json
+import pwd
 import subprocess
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -7,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from gpuboard_agent import main
+from gpuboard_agent import gpu, main, sessions
 from gpuboard_agent.config import AgentConfig, load_agent_config
 from gpuboard_common.models import Container, GpuProcess, Session, VmSnapshot
 from gpuboard_common.serialize import snapshot_from_dict, snapshot_to_dict
@@ -44,6 +45,17 @@ def test_snapshot_json_roundtrip() -> None:
 def test_snapshot_empty_roundtrip() -> None:
     snapshot = VmSnapshot("gpu", datetime.now(UTC))
     assert snapshot_from_dict(snapshot_to_dict(snapshot)) == snapshot
+
+
+def test_snapshot_roundtrip_with_unmapped_uids() -> None:
+    snapshot = replace(
+        full_snapshot(),
+        sessions=(Session("uid:1234", "vscode"),),
+        gpu_processes=(GpuProcess(42, "uid:1234", "kit"),),
+    )
+    assert snapshot_from_dict(json.loads(json.dumps(snapshot_to_dict(snapshot)))) == (
+        snapshot
+    )
 
 
 @pytest.mark.parametrize(
@@ -172,6 +184,40 @@ def test_main_emits_only_json(
     assert output.err == ""
     assert snapshot_from_dict(json.loads(output.out)) == full_snapshot()
     main.build_snapshot.assert_called_once_with(Path("/tmp/agent.yaml"))
+
+
+def test_main_emits_snapshot_with_unmapped_container_uid(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    container_id = "a" * 64
+    container = Container(container_id, "isaac-sim")
+    monkeypatch.setattr(main, "load_agent_config", Mock(return_value=AgentConfig()))
+    monkeypatch.setattr(main, "list_login_sessions", Mock(return_value=[]))
+    monkeypatch.setattr(main, "list_containers", Mock(return_value=[container]))
+    monkeypatch.setattr(main, "read_gpu_model", Mock(return_value="GPU"))
+    monkeypatch.setattr(main, "load_claim", Mock(return_value=None))
+    monkeypatch.setattr(gpu, "query_compute_apps", lambda: "42, kit, GPU-x, 4451\n")
+    monkeypatch.setattr(
+        gpu.Path, "read_text", Mock(return_value=f"0::/docker/{container_id}\n")
+    )
+    responses = [
+        subprocess.CompletedProcess(
+            [], 0, stdout="1234 /home/user/.vscode-server/bin/node\n"
+        ),
+        subprocess.CompletedProcess([], 0, stdout="1234\n"),
+    ]
+    monkeypatch.setattr(sessions.subprocess, "run", Mock(side_effect=responses))
+    monkeypatch.setattr(pwd, "getpwuid", Mock(side_effect=KeyError(1234)))
+
+    assert main.main([]) == 0
+    output = capsys.readouterr()
+    snapshot = snapshot_from_dict(json.loads(output.out))
+    assert snapshot.sessions == (Session("uid:1234", "vscode"),)
+    assert snapshot.gpu_processes[0].user == "uid:1234"
+    assert snapshot.gpu_processes[0].container == "isaac-sim"
+    assert "UID 1234 has no host username" in caplog.text
 
 
 @pytest.mark.parametrize(

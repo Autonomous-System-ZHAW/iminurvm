@@ -192,7 +192,7 @@ def test_find_vscode_users(monkeypatch):
         }[uid]
     )
     monkeypatch.setattr(sessions.subprocess, "run", run)
-    monkeypatch.setattr(sessions.pwd, "getpwuid", lookup)
+    monkeypatch.setattr(pwd, "getpwuid", lookup)
 
     assert sessions.find_vscode_users() == {"alice", "bob"}
     assert lookup.call_count == 2
@@ -228,16 +228,16 @@ def test_find_vscode_users_propagates_ps_failure(monkeypatch):
         sessions.find_vscode_users()
 
 
-def test_find_vscode_users_unmapped_uid_fails(monkeypatch):
+def test_find_vscode_users_unmapped_uid_is_visible(monkeypatch, caplog):
     output = "9999 /home/alice/.vscode-server/bin/node\n"
     monkeypatch.setattr(
         sessions.subprocess,
         "run",
         Mock(return_value=subprocess.CompletedProcess([], 0, stdout=output, stderr="")),
     )
-    monkeypatch.setattr(sessions.pwd, "getpwuid", Mock(side_effect=KeyError(9999)))
-    with pytest.raises(KeyError):
-        sessions.find_vscode_users()
+    monkeypatch.setattr(pwd, "getpwuid", Mock(side_effect=KeyError(9999)))
+    assert sessions.find_vscode_users() == {"uid:9999"}
+    assert "9999" in caplog.text
 
 
 def test_find_vscode_users_detects_real_process(tmp_path):

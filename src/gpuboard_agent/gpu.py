@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import csv
 import io
-import pwd
 import subprocess
 from dataclasses import replace
 from pathlib import Path
 
 from gpuboard_agent.docker import container_id_from_cgroup, find_container
+from gpuboard_agent.users import username_for_uid
 from gpuboard_common.models import Container, GpuProcess
 
 
@@ -97,7 +97,7 @@ def parse_compute_apps_csv(text: str) -> list[GpuProcess]:
 
 
 def resolve_process_user(pid: int) -> str:
-    """Resolve the effective Linux user of a PID, or propagate lookup errors."""
+    """Resolve a PID's host user or report its unmapped numeric UID."""
     if pid <= 0:
         raise ValueError("PID must be positive")
     result = subprocess.run(
@@ -110,7 +110,7 @@ def resolve_process_user(pid: int) -> str:
     uid = result.stdout.strip()
     if not uid.isascii() or not uid.isdecimal():
         raise ValueError(f"invalid process UID for PID {pid}: {uid!r}")
-    return pwd.getpwuid(int(uid)).pw_name
+    return username_for_uid(int(uid))
 
 
 def list_gpu_processes(containers: list[Container]) -> list[GpuProcess]:

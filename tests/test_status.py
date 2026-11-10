@@ -72,6 +72,20 @@ def test_unlabeled_root_container_conflicts() -> None:
     assert derive_status(snap, NOW) is VmStatus.CONFLICT
 
 
+def test_unmapped_gpu_owner_is_conservatively_reported() -> None:
+    process = GpuProcess(pid=4, user="uid:1234", container="sim")
+    assert derive_status(make_snapshot(gpu_processes=(process,)), NOW) is (
+        VmStatus.UNCLAIMED_USAGE
+    )
+    claimed = make_snapshot(make_claim(), gpu_processes=(process,))
+    assert derive_status(claimed, NOW) is VmStatus.CONFLICT
+    labeled = GpuProcess(
+        pid=4, user="uid:1234", container="sim", container_owner="alice"
+    )
+    claimed_labeled = make_snapshot(make_claim(), gpu_processes=(labeled,))
+    assert derive_status(claimed_labeled, NOW) is VmStatus.CLAIMED
+
+
 def test_unclaimed_usage_session() -> None:
     assert (
         derive_status(make_snapshot(sessions=(BOB,)), NOW) is VmStatus.UNCLAIMED_USAGE

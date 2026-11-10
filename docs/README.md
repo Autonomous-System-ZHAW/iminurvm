@@ -85,6 +85,13 @@ collector's own SSH login may appear as a session; filtering service accounts
 and handling that self-observation still need a design before status collection
 is integrated.
 
+If a process UID has no username in the VM's user database, the agent reports
+it as `uid:<number>` (for example `uid:1234`) and logs a warning on stderr.
+This marker identifies a numeric UID, not the person using the process. It
+applies both to VS Code process signals and GPU process users; container user
+accounts do not necessarily exist on the VM. Even a mapped host username may
+not identify the person responsible for a container.
+
 ## Docker observation
 
 The agent lists running containers using `docker ps`, then uses `docker inspect`
@@ -112,8 +119,13 @@ from the inventory cause a collection error, not an idle result. Collection
 is not atomic: processes may exit or PIDs may be reused between commands.
 Unrecognized container runtime cgroup layouts are not attributed to Docker.
 The query does not cover graphics-only processes, GPU utilization, or
-containers that have no GPU compute process. Agent snapshot integration
-remains to be implemented.
+containers that have no GPU compute process. Status derivation uses the
+`owner` label as the effective GPU process owner when present.
+Without that label, an unmapped UID is considered activity but cannot match a
+normal claim owner. An active claim therefore yields `CONFLICT` for that
+process, even if it actually belongs to the claim owner; an expired claim may
+not be associated with that owner's activity. Set `owner` and `project` labels
+when creating containers to improve attribution.
 
 ## Permissions model
 
