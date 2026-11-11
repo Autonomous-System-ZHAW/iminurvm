@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import unicodedata
 from dataclasses import dataclass
@@ -146,35 +147,101 @@ def _safe(value: str) -> str:
 
 def _cell(value: str, width: int) -> str:
     value = _safe(value)
-    return value if len(value) <= width else value[: width - 1] + "~"
+
+    def char_width(char: str) -> int:
+        if unicodedata.combining(char):
+            return 0
+        return 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+
+    size = sum(char_width(char) for char in value)
+    if size <= width:
+        return value + " " * (width - size)
+    result = ""
+    used = 0
+    for char in value:
+        char_size = char_width(char)
+        if used + char_size > width - 1:
+            break
+        result += char
+        used += char_size
+    return result + "~" + " " * (width - used - 1)
 
 
-def render_board(board: StatusBoard) -> str:
-    """Render a terminal table with observation times and warnings."""
+def _paint(text: str, color: str, enabled: bool) -> str:
+    return f"\033[{color}m{text}\033[0m" if enabled else text
+
+
+def _status_label(row: StatusRow) -> str:
+    if row.status == VmStatus.OFF_UNREACHABLE:
+        return "OFF" if row.freshness == "NOT_APPLICABLE" else "UNREACHABLE"
+    return row.status.value
+
+
+def render_board(
+    board: StatusBoard, *, verbose: bool = False, color: bool = False
+) -> str:
+    """Render a compact table; include additional observations when verbose."""
+    status_colors = {
+        "FREE": "32",
+        "CLAIMED": "36",
+        "CLAIM_EXPIRED": "33",
+        "UNCLAIMED_USAGE": "33",
+        "CONFLICT": "31",
+        "OFF": "2",
+        "UNREACHABLE": "31",
+    }
+    freshness_colors = {
+        "FRESH": "32",
+        "STALE": "33",
+        "CLOCK_WARNING": "31",
+        "UNAVAILABLE": "31",
+        "NOT_APPLICABLE": "2",
+    }
     lines = [
-        f"Board: {board.freshness} | generated: {board.generated_at}"
-        f" | assessed: {board.assessed_at}",
+        f"Board: {_paint(board.freshness, freshness_colors[board.freshness], color)}"
+        f" | generated: {parse_iso(board.generated_at).isoformat(timespec='seconds')}",
     ]
+    if verbose:
+        lines.append(f"Assessed: {_safe(board.assessed_at)}")
     if board.freshness != "FRESH":
         lines.append("WARNING: board inventory and statuses may not be current.")
     lines.append(
-        f"{'VMID':<7} {'NAME':<20} {'NODE':<16} {'STATUS':<17} "
-        f"{'SNAPSHOT':<14} {'OWNER':<16} {'PROJECT':<20} {'UNTIL'}"
+        f"{'ID':<5} {'NAME':<14} {'STATUS':<15} {'CLAIM':<10} "
+        f"{'USERS':<14} {'SNAPSHOT'}"
     )
     if not board.rows:
         lines.append("(no VMs in collector inventory)")
     for row in board.rows:
         snapshot = row.snapshot
         claim = snapshot.claim if snapshot else None
-        lines.append(
-            f"{row.vmid:<7} {_cell(row.name, 20):<20} {_cell(row.node, 16):<16} "
-            f"{row.status.value:<17} {row.freshness:<14} "
-            f"{_cell(claim.owner if claim else '-', 16):<16} "
-            f"{_cell(claim.project if claim and claim.project else '-', 20):<20} "
-            f"{_safe(claim.end.isoformat(timespec='seconds')) if claim else '-'}"
+        users = (
+            sorted(
+                {session.user for session in snapshot.sessions}
+                | {process.effective_owner for process in snapshot.gpu_processes}
+            )
+            if snapshot
+            else []
         )
+        label = _status_label(row)
+        observation = "N/A" if row.freshness == "NOT_APPLICABLE" else row.freshness
+        lines.append(
+            f"{row.vmid:<5} {_cell(row.name, 14)} "
+            f"{_paint(f'{label:<15}', status_colors[label], color)} "
+            f"{_cell(claim.owner if claim else '-', 10)} "
+            f"{_cell(','.join(users) or '-', 14)} "
+            f"{_paint(observation, freshness_colors[row.freshness], color)}"
+        )
+        if not verbose:
+            continue
+        lines.append(f"  name: {_safe(row.name)} | node: {_safe(row.node)}")
+        if claim:
+            lines.append(
+                f"  claim: {_safe(claim.owner)}"
+                f" | project: {_safe(claim.project or '-')}"
+                f" | until: {claim.end.isoformat(timespec='seconds')}"
+            )
         if snapshot:
-            users = ", ".join(
+            session_users = ", ".join(
                 sorted({_safe(session.user) for session in snapshot.sessions})
             )
             owners = ", ".join(
@@ -188,7 +255,7 @@ def render_board(board: StatusBoard) -> str:
             lines.append(
                 f"  observed: {snapshot.collected_at.isoformat(timespec='seconds')} | "
                 f"GPU: {_safe(snapshot.gpu_model or '-')} | "
-                f"sessions: {users or '-'} | GPU users: {owners or '-'}"
+                f"sessions: {session_users or '-'} | GPU users: {owners or '-'}"
             )
             if claim and claim.message:
                 lines.append(f"  claim message: {_safe(claim.message)}")
@@ -202,6 +269,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vm-status", description=__doc__)
     parser.add_argument(
         "--json", action="store_true", help="print validated collector JSON"
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="show VM details")
+    parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="color output (default: auto for terminals)",
     )
     parser.add_argument("--url", help="override collector status URL")
     add_config_argument(parser)
@@ -217,7 +291,17 @@ def main(argv: list[str] | None = None) -> int:
         if url is None:
             raise ValueError("set collector_status_url in agent.yaml or use --url")
         board, data = fetch_status(url)
-        print(json.dumps(data, ensure_ascii=True) if args.json else render_board(board))
+        use_color = args.color == "always" or (
+            args.color == "auto"
+            and sys.stdout.isatty()
+            and os.environ.get("TERM") != "dumb"
+            and not os.environ.get("NO_COLOR")
+        )
+        print(
+            json.dumps(data, ensure_ascii=True)
+            if args.json
+            else render_board(board, verbose=args.verbose, color=use_color)
+        )
     except (OSError, ValueError, OverflowError) as exc:
         print(f"vm-status: {_safe(str(exc))}", file=sys.stderr)
         return 1

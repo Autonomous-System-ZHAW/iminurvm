@@ -17,16 +17,26 @@ Replace the example address with your collector's address. Then run:
 
 ```sh
 vm-status
+vm-status --verbose
+vm-status --color never
 vm-status --json
 vm-status --url http://10.0.0.123:8080/status.json
 ```
 
-The table shows all VMs in the collector's inventory, claim owner, project and
-expiry, sessions, GPU owners, and per-VM errors. Times include UTC offsets.
+The compact table shows all VMs, claim owner, observed session and GPU users,
+and freshness. Long names and user lists are shortened with `~`; use
+`--verbose` for full names, node, claim project and expiry, session and GPU
+details, claim messages and per-VM errors. `OFF` means Proxmox reported a
+stopped VM; `UNREACHABLE` means a running VM has no snapshot. Both correspond
+to the collector status `OFF_UNREACHABLE`. `N/A` means snapshot freshness
+is not applicable to a stopped VM. Times include UTC offsets.
 The board and each snapshot have separate freshness indicators. A stale board
 makes the entire table potentially out of date, even if an individual snapshot
 appears fresh. Claim changes can take a polling cycle to appear. The `--json`
 option prints the validated collector response, including detailed snapshots.
+Colors are enabled automatically only for interactive terminals (unless
+`NO_COLOR` is set or `TERM=dumb`); use `--color always` or `--color never`
+to override. JSON output never includes terminal colors.
 
 Connection failures, unavailable boards (HTTP 503), invalid responses and
 missing configuration are reported on stderr with a nonzero exit code; stale

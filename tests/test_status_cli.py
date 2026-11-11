@@ -1,4 +1,5 @@
 import json
+import re
 import threading
 from copy import deepcopy
 from dataclasses import replace
@@ -41,7 +42,7 @@ def payload(monkeypatch):
 
 
 def test_table_shows_claim_activity_and_errors(payload):
-    output = status.render_board(status.parse_board(payload))
+    output = status.render_board(status.parse_board(payload), verbose=True)
     for expected in (
         "Board: FRESH",
         "CLAIMED",
@@ -50,13 +51,79 @@ def test_table_shows_claim_activity_and_errors(payload):
         "2026-11-04T13:00:00+01:00",
         "sessions: alice, bob",
         "GPU users: alice",
-        "NOT_APPLICABLE",
+        "N/A",
         "UNAVAILABLE",
         "error: no address",
         "claim message: hello  [31mworld",
     ):
         assert expected in output
     assert "\x1b" not in output
+
+
+def test_compact_table_shows_every_vm_in_at_most_80_columns(payload):
+    output = status.render_board(status.parse_board(payload))
+    lines = output.splitlines()
+    assert len(lines) == 5
+    assert all(len(line) <= 80 for line in lines)
+    assert "CLAIMED" in lines[2] and "alice,bob" in lines[2]
+    assert "OFF" in lines[3] and "N/A" in lines[3]
+    assert "UNREACHABLE" in lines[4] and "UNAVAILABLE" in lines[4]
+    assert "error:" not in output
+    assert "observed:" not in output
+
+
+def test_colors_and_no_color_have_same_visible_content(payload):
+    board = status.parse_board(payload)
+    plain = status.render_board(board)
+    colored = status.render_board(board, color=True)
+    assert "\x1b[36m" in colored
+    assert "\x1b[31m" in colored
+    assert re.sub(r"\x1b\[[0-9]+m", "", colored) == plain
+
+
+def test_unicode_columns_and_long_names(payload):
+    payload["vms"][0]["inventory"]["name"] = "世界longname-123456"
+    board = status.parse_board(payload)
+    output = status.render_board(board)
+    assert "世界longname-~" in output
+    assert "世界longname-123456" in status.render_board(board, verbose=True)
+
+
+@pytest.mark.parametrize(
+    ("tty", "term", "no_color", "option", "colored"),
+    [
+        (True, "xterm", None, [], True),
+        (False, "xterm", None, [], False),
+        (True, "dumb", None, [], False),
+        (True, "xterm", "1", [], False),
+        (False, "dumb", "1", ["--color", "always"], True),
+        (True, "xterm", None, ["--color", "never"], False),
+    ],
+)
+def test_color_modes(
+    payload, monkeypatch, capsys, tmp_path, tty, term, no_color, option, colored
+):
+    config = tmp_path / "agent.yaml"
+    config.write_text("{}\n")
+
+    def fetch(url):
+        assert url == "http://host/status.json"
+        return status.parse_board(payload), payload
+
+    monkeypatch.setattr(status, "fetch_status", fetch)
+    monkeypatch.setattr(status.sys.stdout, "isatty", lambda: tty)
+    monkeypatch.setenv("TERM", term)
+    if no_color is None:
+        monkeypatch.delenv("NO_COLOR", raising=False)
+    else:
+        monkeypatch.setenv("NO_COLOR", no_color)
+    assert (
+        status.main(
+            ["--config", str(config), "--url", "http://host/status.json", *option]
+        )
+        == 0
+    )
+    assert ("\x1b[" in capsys.readouterr().out) is colored
 
 
 def test_stale_board_and_snapshot_warning_visible(payload):
@@ -159,6 +226,12 @@ def test_client_against_real_endpoint(monkeypatch, capsys, tmp_path):
         data = json.loads(capsys.readouterr().out)
         assert data["vms"][0]["inventory"]["vmid"] == 111
         assert data["freshness"] == "FRESH"
+        assert status.main(["--config", str(config), "--color", "always"]) == 0
+        assert "\x1b[32m" in capsys.readouterr().out
+        assert (
+            status.main(["--config", str(config), "--json", "--color", "always"]) == 0
+        )
+        assert "\x1b" not in capsys.readouterr().out
     finally:
         server.shutdown()
         server.server_close()
