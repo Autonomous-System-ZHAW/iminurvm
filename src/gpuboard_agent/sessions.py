@@ -150,3 +150,11 @@ def merge_vscode_sessions(
             for user in sorted(vscode_users - existing)
         ),
     ]
+
+
+def exclude_session_users(
+    sessions: list[Session], excluded_users: tuple[str, ...]
+) -> list[Session]:
+    """Exclude configured service accounts from observed session signals."""
+    excluded = set(excluded_users)
+    return [session for session in sessions if session.user not in excluded]

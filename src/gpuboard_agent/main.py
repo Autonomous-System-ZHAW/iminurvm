@@ -13,6 +13,7 @@ from gpuboard_agent.config import load_agent_config
 from gpuboard_agent.docker import list_containers
 from gpuboard_agent.gpu import list_gpu_processes, read_gpu_model
 from gpuboard_agent.sessions import (
+    exclude_session_users,
     find_vscode_users,
     list_login_sessions,
     merge_vscode_sessions,
@@ -26,7 +27,10 @@ from gpuboard_common.timeutil import now
 def build_snapshot(config_path: Path | None = None) -> VmSnapshot:
     """Collect local observations; fail if a required source is unavailable."""
     config = load_agent_config(config_path)
-    sessions = merge_vscode_sessions(list_login_sessions(), find_vscode_users())
+    sessions = exclude_session_users(
+        merge_vscode_sessions(list_login_sessions(), find_vscode_users()),
+        config.excluded_session_users,
+    )
     containers = list_containers()
     gpu_model = read_gpu_model()
     processes = list_gpu_processes(containers)

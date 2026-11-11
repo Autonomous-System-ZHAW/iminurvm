@@ -20,6 +20,7 @@ class AgentConfig:
     idle_grace_minutes: float = 30.0
     pam_auto_claim_enabled: bool = True
     default_claim_hours: float = 4.0
+    excluded_session_users: tuple[str, ...] = ()
 
 
 def load_agent_config(path: Path | None = None) -> AgentConfig:
@@ -43,6 +44,7 @@ def load_agent_config(path: Path | None = None) -> AgentConfig:
         "idle_grace_minutes",
         "pam_auto_claim_enabled",
         "default_claim_hours",
+        "excluded_session_users",
     }
     if any(not isinstance(key, str) or key not in allowed for key in data):
         raise ValueError(f"unknown agent config key in {config_path}")
@@ -69,10 +71,21 @@ def load_agent_config(path: Path | None = None) -> AgentConfig:
     enabled = data.get("pam_auto_claim_enabled", defaults.pam_auto_claim_enabled)
     if not isinstance(enabled, bool):
         raise ValueError("pam_auto_claim_enabled must be a boolean")
+    excluded = data.get("excluded_session_users", [])
+    if not isinstance(excluded, list) or any(
+        not isinstance(user, str)
+        or not user
+        or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in user)
+        for user in excluded
+    ):
+        raise ValueError("excluded_session_users must be a list of nonempty usernames")
+    if len(set(excluded)) != len(excluded):
+        raise ValueError("excluded_session_users contains duplicate usernames")
     return AgentConfig(
         claim_path=claim,
         auto_claim_hours=durations["auto_claim_hours"],
         idle_grace_minutes=durations["idle_grace_minutes"],
         default_claim_hours=durations["default_claim_hours"],
         pam_auto_claim_enabled=enabled,
+        excluded_session_users=tuple(excluded),
     )

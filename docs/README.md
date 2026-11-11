@@ -128,10 +128,26 @@ permissions can limit visibility. `merge_vscode_sessions()` keeps login
 sessions intact and adds one `vscode` entry per detected user; this entry is a
 process signal, not a confirmed login. The current status rules count that
 entry as activity, so a lingering process can prevent a VM from appearing
-free. With SSH pull, the collector's own SSH login may appear as a session;
-filtering service accounts
-and handling that self-observation still need a design before status collection
-is integrated.
+free. For SSH pull, the VM can exclude dedicated service-account session
+signals using `excluded_session_users` in the agent configuration:
+
+```yaml
+excluded_session_users:
+  - gpuboard
+```
+
+By default the list is empty. Exclusions match exact usernames and apply to
+all login sessions and VS Code process signals for those accounts in both
+snapshots and cleanup. GPU processes are **not** excluded. Do not list
+personal or shared user accounts: their activity would be hidden and cleanup
+could remove a claim while they are working. Excluding a service account also
+hides its interactive logins, so reserve that account for collection. The
+setting does not disable auto-claims or change PAM behavior.
+
+The agent and cleanup must load the same VM-side configuration, normally
+`/etc/gpuboard/agent.yaml`. A collector-side SSH setting alone does not set
+this option. Keep the config administrator-controlled and verify filtering on
+the VM before relying on it. The collector poll loop remains unimplemented.
 
 If a process UID has no username in the VM's user database, the agent reports
 it as `uid:<number>` (for example `uid:1234`) and logs a warning on stderr.
@@ -177,10 +193,11 @@ missing address, connection error, timeout, nonzero agent exit or invalid
 snapshot is an error for that VM; stopped VMs are not contacted. Pulls run
 concurrently with at most eight workers.
 
-The SSH connection itself may be reported as a user session and can affect
-status and cleanup. It is not filtered yet: resolve this before relying on
-collector status or deploying periodic polling. The collector poll loop is
-also not implemented, and SSH pull has not been tested against a VM.
+An SSH connection can appear as a user session. Set `excluded_session_users`
+on the VM for a dedicated collector account as described above; verify the
+agent and cleanup use the same configuration. The collector poll loop is not
+implemented. A single SSH pull has been tested on VM 111; the session
+exclusion still needs real-VM validation.
 
 ## GPU observation
 

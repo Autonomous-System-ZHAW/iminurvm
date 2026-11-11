@@ -4,3 +4,6 @@ default_claim_hours: 4
 auto_claim_hours: 4        # PAM soft claim duration (kind "auto")
 idle_grace_minutes: 30     # wait after expiry, then remove only if idle
 pam_auto_claim_enabled: true
+# Exclude only dedicated service accounts from login and VS Code session signals.
+# GPU processes remain visible and still prevent cleanup.
+excluded_session_users: []

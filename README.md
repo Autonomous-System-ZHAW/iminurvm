@@ -80,7 +80,9 @@ next snapshot.
    0 % GPU utilization.
 3. Claims always expire. Extend actively if you need longer. Once expired for
    the configured grace period (default 30 min), claims are cleaned up if no
-   sessions, VS Code server processes or GPU compute processes are detected.
+   non-excluded sessions, VS Code server processes or GPU compute processes
+   are detected. Only explicitly configured service-account session signals
+   can be excluded; GPU processes always count.
    Running containers without GPU compute activity do not prevent cleanup.
    See the [cleanup guide](agent/README.md#expired-claim-cleanup) for limits.
 

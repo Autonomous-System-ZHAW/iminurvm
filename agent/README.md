@@ -7,8 +7,8 @@ Example config: `agent.example.yaml`.
 ## Expired-claim cleanup
 
 `vm-cleanup` checks the configured claim once. It removes it only after
-`idle_grace_minutes` has elapsed since expiry and no login session, VS Code
-server process, or GPU compute process is detected. A detection error fails
+`idle_grace_minutes` has elapsed since expiry and no non-excluded login session
+or VS Code server process, or any GPU compute process, is detected. A detection error fails
 the command and preserves the claim. It does not check Docker containers or
 graphics-only GPU processes; a running container with no compute process does
 not prevent removal. These observations are not atomic.
@@ -36,6 +36,13 @@ The timer first runs five minutes after boot and then approximately every five
 minutes. Running `vm-cleanup` manually from an SSH login will normally detect
 that login as activity and leave the claim in place. Closing logind sessions
 and lingering VS Code processes can also prevent cleanup.
+
+To ignore a dedicated collector account's login and VS Code session signals,
+configure `excluded_session_users` on the VM. The list is empty by default;
+GPU processes still prevent cleanup. See
+[login session collection](../docs/README.md#login-session-collection) for
+the configuration and important restrictions. Use the same configuration for
+both `vm-agent` and `vm-cleanup`.
 
 An expired manual or run claim that remains in the file prevents `vm-claim`
 from creating a replacement. For user-facing recovery steps and the

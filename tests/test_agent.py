@@ -119,7 +119,7 @@ def test_config_defaults_and_overrides(
     path = tmp_path / "agent.yaml"
     path.write_text(
         "claim_path: /tmp/claim.json\npam_auto_claim_enabled: false\n"
-        "idle_grace_minutes: 0\n",
+        "idle_grace_minutes: 0\nexcluded_session_users: [gpuboard, collector]\n",
         encoding="utf-8",
     )
     loaded = load_agent_config(path)
@@ -127,6 +127,7 @@ def test_config_defaults_and_overrides(
     assert loaded.pam_auto_claim_enabled is False
     assert loaded.idle_grace_minutes == 0
     assert loaded.auto_claim_hours == 4
+    assert loaded.excluded_session_users == ("gpuboard", "collector")
 
 
 @pytest.mark.parametrize(
@@ -141,6 +142,13 @@ def test_config_defaults_and_overrides(
         "auto_claim_hours: true",
         "idle_grace_minutes: -1",
         "default_claim_hours: .inf",
+        "excluded_session_users: gpuboard",
+        "excluded_session_users: null",
+        "excluded_session_users: [gpuboard, gpuboard]",
+        "excluded_session_users: [null]",
+        "excluded_session_users: ['']",
+        "excluded_session_users: [' gpuboard']",
+        "excluded_session_users: ['gpu board']",
         "x: [",
     ],
 )
@@ -173,6 +181,29 @@ def test_build_snapshot_wires_collectors(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     gpu.assert_called_once_with(containers)
     main.load_claim.assert_called_once_with(config.claim_path)
+
+
+def test_snapshot_excludes_only_configured_session_signals(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = AgentConfig(excluded_session_users=("gpuboard",))
+    monkeypatch.setattr(main, "load_agent_config", Mock(return_value=config))
+    monkeypatch.setattr(
+        main,
+        "list_login_sessions",
+        Mock(return_value=[Session("gpuboard"), Session("alice")]),
+    )
+    monkeypatch.setattr(
+        main, "find_vscode_users", Mock(return_value={"gpuboard", "alice"})
+    )
+    monkeypatch.setattr(main, "list_containers", Mock(return_value=[]))
+    monkeypatch.setattr(main, "read_gpu_model", Mock(return_value="GPU"))
+    gpu_process = GpuProcess(42, "gpuboard", "kit")
+    monkeypatch.setattr(main, "list_gpu_processes", Mock(return_value=[gpu_process]))
+    monkeypatch.setattr(main, "load_claim", Mock(return_value=None))
+    snapshot = main.build_snapshot()
+    assert snapshot.sessions == (Session("alice"), Session("alice", "vscode"))
+    assert snapshot.gpu_processes == (gpu_process,)
 
 
 def test_main_emits_only_json(
