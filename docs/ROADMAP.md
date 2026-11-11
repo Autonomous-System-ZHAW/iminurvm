@@ -32,10 +32,11 @@ and simulation wrappers are deferred as optional enhancements.
 2. Collector configuration loader and `gpu`-tagged Proxmox inventory
    implemented; initial inventory tested against both cluster nodes.
    Single SSH snapshot pull tested against VM 111. Opt-in service-account
-   session exclusion implemented; validate it on a VM. Docker group access
+   session exclusion validated in a VM snapshot. Docker group access
    accepted for the initial test;
    investigate restricted access in issue #7.
-3. `merge.py`: derive status centrally; `status.json` and freshness tracking
+3. `merge.py`: in-memory merge and status derivation implemented; `status.json`
+   serialization, atomic writing and freshness tracking remain
 4. `web.py`: read-only per-VM status endpoint, dashboard and `/metrics`
 5. `vm-status`, `motd.py` + `profile.d` shim: use collector status, show
    observation time and report stale/unavailable data with a short timeout

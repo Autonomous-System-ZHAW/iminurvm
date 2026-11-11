@@ -32,13 +32,19 @@ Stopped or unavailable VMs get `OFF_UNREACHABLE`, even if an old snapshot
 exists. `VmEntry` combines inventory, the current snapshot when available,
 the derived status and any collection error.
 
+The in-memory merge sorts entries by node and VM ID. Stopped VMs have no
+snapshot; failed or missing pulls on running VMs produce `OFF_UNREACHABLE`
+with an error rather than `FREE`. A successful pull retains its observation
+timestamp. Duplicate VM IDs and results for unknown IDs fail the merge.
+The merge does not yet assess snapshot freshness or write `status.json`.
+
 The planned `vm-status` and MOTD clients display the collector's latest
 observations and derived status, with a collection timestamp. A local claim
 change can take time to reach the collector. Clients must indicate stale or
 unavailable results and use a short timeout so login is not held up; they may
 show the local claim separately, without presenting it as a collector status.
-Status freshness thresholds have not been decided. The MVP will use SSH pull
-for snapshots, but the collector transport is not yet implemented.
+Status freshness thresholds have not been decided. SSH snapshot pull is
+implemented, but the collector poll loop is not yet implemented.
 
 ## Collector configuration
 
