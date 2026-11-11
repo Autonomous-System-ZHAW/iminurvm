@@ -50,17 +50,70 @@ The status file is created with mode `0600`; it may contain user names,
 container labels and other sensitive information. The target directory must
 already exist. Errors propagate, and a failed replacement leaves the previous
 file in place; its `generated_at` does not update, so consumers must not
-assume an existing file is current. Freshness thresholds, the polling loop and
-the public HTTP endpoint are not implemented yet. Do not expose this file or
-its contents broadly without evaluating access and data sensitivity.
+assume an existing file is current. Freshness thresholds and the public HTTP
+endpoint are not implemented yet. Do not expose this file or its contents
+broadly without evaluating access and data sensitivity.
+
+## Testing one collector cycle
+
+`poll_once(config_path)` loads collector configuration, fetches the complete
+Proxmox inventory, pulls running VMs, merges results at the current time, and
+writes the configured status file. Individual SSH failures appear as VM errors;
+configuration, inventory or write failures abort the cycle and propagate. A
+failed cycle leaves any previous status file in place, which may be stale.
+
+For a manual laptop test, use your existing private test configuration outside
+the repository. Set `status_path` to an absolute path in a private directory
+that already exists (such as your `~/.config/gpuboard-test` directory, with
+`~` expanded in the YAML). Confirm the VM addresses, SSH key, agent path and
+verified host keys first. The cycle contacts every configured Proxmox node and
+tries SSH for every running tagged VM with an address.
+
+```sh
+python - <<'PY'
+from pathlib import Path
+from gpuboard_collector.main import poll_once
+
+config = Path.home() / ".config/gpuboard-test/collector.yaml"
+board = poll_once(str(config))
+for entry in board.vms:
+    print(entry.inventory.vmid, entry.status.value, entry.error or "")
+PY
+```
+
+Inspect the configured status file locally with `python -m json.tool`, taking
+care not to share sensitive session or container data. This runs only once;
+it does not start the collector service or enable a timer. If a VM has no SSH
+address, its entry reports `OFF_UNREACHABLE` and a missing-address error.
+
+## Continuous polling (MVP)
+
+Run `gpu-board-collector --config /absolute/path/to/collector.yaml` to start
+polling. It runs one cycle immediately, then waits `poll_interval_seconds`
+after each cycle completes (30 seconds by default); slow cycles therefore
+increase the time between starts. Cycles do not overlap. Press Ctrl+C to
+stop it when testing interactively.
+
+An SSH failure is logged and included as an error for that VM. If an entire
+cycle fails, the collector logs the failure, preserves the last status file
+without changing `generated_at`, and retries after the interval. Its existence
+does not mean its contents are current. Configuration is reloaded between
+cycles; if reloading fails, the collector logs the failure and skips polling
+until the configuration is valid again, retrying at the last valid interval.
+An invalid or missing configuration at startup causes a nonzero exit.
+
+The loop does not serve a dashboard or HTTP endpoint yet and does not determine
+whether existing data is stale. Do not present the file as current without
+checking its timestamps. The systemd unit is a deployment template; the loop
+and service have not yet been validated on the collector host.
 
 The planned `vm-status` and MOTD clients display the collector's latest
 observations and derived status, with a collection timestamp. A local claim
 change can take time to reach the collector. Clients must indicate stale or
 unavailable results and use a short timeout so login is not held up; they may
 show the local claim separately, without presenting it as a collector status.
-Status freshness thresholds have not been decided. SSH snapshot pull is
-implemented, but the collector poll loop is not yet implemented.
+Status freshness thresholds have not been decided. SSH snapshot pull and the
+polling loop are implemented; the dashboard and clients are not yet.
 
 ## Collector configuration
 
@@ -79,9 +132,8 @@ listener port must be between 1 and 65535. Unknown fields, duplicate YAML
 keys, duplicate node names and duplicate VM IDs are rejected.
 
 Loading configuration does not read the token files, check file permissions,
-contact Proxmox or establish SSH connections. The collector service, inventory
-poll loop and snapshot transport are not implemented yet; validation does not
-prove a configuration will connect successfully.
+contact Proxmox or establish SSH connections. Validation does not prove a
+configuration will connect successfully.
 
 ## Proxmox inventory
 
@@ -169,7 +221,7 @@ setting does not disable auto-claims or change PAM behavior.
 The agent and cleanup must load the same VM-side configuration, normally
 `/etc/gpuboard/agent.yaml`. A collector-side SSH setting alone does not set
 this option. Keep the config administrator-controlled and verify filtering on
-the VM before relying on it. The collector poll loop remains unimplemented.
+each VM before relying on it.
 
 If a process UID has no username in the VM's user database, the agent reports
 it as `uid:<number>` (for example `uid:1234`) and logs a warning on stderr.
@@ -217,9 +269,9 @@ concurrently with at most eight workers.
 
 An SSH connection can appear as a user session. Set `excluded_session_users`
 on the VM for a dedicated collector account as described above; verify the
-agent and cleanup use the same configuration. The collector poll loop is not
-implemented. A single SSH pull has been tested on VM 111; the session
-exclusion still needs real-VM validation.
+agent and cleanup use the same configuration. A single SSH pull and session
+exclusion have been tested on VM 111; cleanup with the exclusion still needs
+real-VM validation.
 
 ## GPU observation
 
