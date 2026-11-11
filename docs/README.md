@@ -101,8 +101,7 @@ cycles; if reloading fails, the collector logs the failure and skips polling
 until the configuration is valid again, retrying at the last valid interval.
 An invalid or missing configuration at startup causes a nonzero exit.
 
-The collector also serves the read-only status endpoint described below. The
-dashboard and terminal clients are not yet implemented.
+The collector also serves the read-only status endpoint described below.
 
 ## Read-only HTTP status endpoint
 
@@ -155,15 +154,14 @@ The assessment uses the configured interval supplied by the caller and must be
 recomputed when displaying data; it is not saved in `status.json`. VM clocks
 must be synchronized for snapshot age to be meaningful. A long polling cycle
 can trigger warnings even while polling works. This logic is implemented and
-used by the HTTP endpoint; the dashboard and HTTP clients are not implemented.
+used by the HTTP endpoint and `vm-status`; the dashboard is not implemented.
 
-The planned `vm-status` and MOTD clients display the collector's latest
+`vm-status` displays the collector's latest
 observations and derived status, with a collection timestamp. A local claim
-change can take time to reach the collector. Clients must indicate stale or
-unavailable results and use a short timeout so login is not held up; they may
-show the local claim separately, without presenting it as a collector status.
-SSH snapshot pull, the polling loop and the endpoint are implemented; the
-dashboard and clients are not yet.
+change can take time to reach the collector. See the
+[`vm-status` guide](../cli/README.md#viewing-the-collector-status).
+MOTD remains planned and should indicate stale or unavailable results and
+use a short timeout so login is not held up.
 
 ## Collector configuration
 

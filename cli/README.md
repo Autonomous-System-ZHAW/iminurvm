@@ -4,6 +4,37 @@ User commands (`vm-claim`, `vm-extend`, `vm-release`, `vm-status`, `vm-run`,
 `sim-start`, `sim-stop`). Code: `src/gpuboard_agent/cli/`. Installed as
 console scripts by `pip install`.
 
+## Viewing the collector status
+
+Configure the collector's status endpoint on each VM in
+`/etc/gpuboard/agent.yaml` (keep existing settings):
+
+```yaml
+collector_status_url: http://10.0.0.123:8080/status.json
+```
+
+Replace the example address with your collector's address. Then run:
+
+```sh
+vm-status
+vm-status --json
+vm-status --url http://10.0.0.123:8080/status.json
+```
+
+The table shows all VMs in the collector's inventory, claim owner, project and
+expiry, sessions, GPU owners, and per-VM errors. Times include UTC offsets.
+The board and each snapshot have separate freshness indicators. A stale board
+makes the entire table potentially out of date, even if an individual snapshot
+appears fresh. Claim changes can take a polling cycle to appear. The `--json`
+option prints the validated collector response, including detailed snapshots.
+
+Connection failures, unavailable boards (HTTP 503), invalid responses and
+missing configuration are reported on stderr with a nonzero exit code; stale
+or clock-warning observations remain visible and return zero. The network
+request uses a three-second socket timeout and an 8 MiB response limit; DNS
+lookup and a peer sending data slowly can take longer. The endpoint is
+unauthenticated and HTTP is unencrypted: only use it on an appropriate network.
+
 ## Claim commands
 
 These commands use `/etc/gpuboard/agent.yaml` by default, or `--config PATH`
@@ -58,7 +89,7 @@ If a claim blocks you:
 Use the same `--config PATH` on these commands if a non-default configuration
 is in use.
 
-The planned collector's status is based on observed activity, not whether the
+The collector's status is based on observed activity, not whether the
 claim file can be replaced:
 
 - `CLAIM_EXPIRED`: the expired claim's owner has an observed session, VS Code
@@ -69,6 +100,6 @@ claim file can be replaced:
   may still exist during the grace period, while cleanup is disabled, or after
   a cleanup error, so `vm-claim` can still refuse a new claim.
 
-These are status rules, not a live dashboard: the collector is not yet
-implemented. The cleanup policy and this mismatch are future discussion items;
+These are status rules, not a guarantee of claim availability. The cleanup
+policy and this mismatch are future discussion items;
 see [issue #4](https://github.com/Autonomous-System-ZHAW/iminurvm/issues/4).

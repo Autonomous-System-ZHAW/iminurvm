@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -21,6 +22,32 @@ class AgentConfig:
     pam_auto_claim_enabled: bool = True
     default_claim_hours: float = 4.0
     excluded_session_users: tuple[str, ...] = ()
+    collector_status_url: str | None = None
+
+
+def validate_collector_status_url(value: object) -> str:
+    """Validate the configured HTTP(S) collector status URL."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value)
+    ):
+        raise ValueError("collector_status_url must be a valid HTTP(S) URL")
+    try:
+        parts = urlsplit(value)
+        if (
+            parts.scheme not in ("http", "https")
+            or not parts.hostname
+            or parts.username is not None
+            or parts.password is not None
+            or parts.query
+            or parts.fragment
+            or parts.port == 0
+        ):
+            raise ValueError("invalid URL")
+    except ValueError as exc:
+        raise ValueError("collector_status_url must be a valid HTTP(S) URL") from exc
+    return value
 
 
 def load_agent_config(path: Path | None = None) -> AgentConfig:
@@ -45,6 +72,7 @@ def load_agent_config(path: Path | None = None) -> AgentConfig:
         "pam_auto_claim_enabled",
         "default_claim_hours",
         "excluded_session_users",
+        "collector_status_url",
     }
     if any(not isinstance(key, str) or key not in allowed for key in data):
         raise ValueError(f"unknown agent config key in {config_path}")
@@ -88,4 +116,9 @@ def load_agent_config(path: Path | None = None) -> AgentConfig:
         default_claim_hours=durations["default_claim_hours"],
         pam_auto_claim_enabled=enabled,
         excluded_session_users=tuple(excluded),
+        collector_status_url=(
+            validate_collector_status_url(data["collector_status_url"])
+            if "collector_status_url" in data
+            else None
+        ),
     )

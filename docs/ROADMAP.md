@@ -40,8 +40,9 @@ and simulation wrappers are deferred as optional enhancements.
    retry and freshness assessment implemented; continuous polling tested on
    the cluster. Client integration of freshness remains.
 4. Read-only JSON status endpoint implemented; `/metrics` remains.
-5. `vm-status`, `motd.py` + `profile.d` shim: use collector status, show
-   observation time and report stale/unavailable data with a short timeout
+5. `vm-status` implemented using collector status and freshness. `motd.py` +
+   `profile.d` shim remain: show observation time and report stale/unavailable
+   data with a short timeout
 
 ## Phase 4 — VM rollout
 
