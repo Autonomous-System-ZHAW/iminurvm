@@ -32,7 +32,7 @@ GPU usage (mapped to user and Docker container), and the claim.
 | OFF_UNREACHABLE | Proxmox reports VM stopped, or agent not reachable |
 
 The precise rules live in [`status.py`](src/gpuboard_common/status.py).
-These rules are implemented, but the collector and dashboard are not yet.
+These rules and the collector are implemented; the browser dashboard is deferred.
 An expired claim file can remain even when the derived status is `FREE`, so
 `FREE` does not guarantee that `vm-claim` will accept a new claim. See
 [expired claims and blocked claims](cli/README.md#expired-claims-and-blocked-claims).
@@ -48,8 +48,8 @@ An expired claim file can remain even when the derived status is `FREE`, so
                ▼                                   ▼
         ┌──────────── Collector (small LXC / VM "gpu-board") ─────────┐
         │  merge inventory + snapshots; derive status centrally       │
-        │  → status.json → web dashboard (single page, auto-refresh)  │
-        │  → /metrics (Prometheus text format, prepared, optional)    │
+        │  → status.json and read-only HTTP status endpoint            │
+        │  → dashboard and /metrics (planned)                         │
         └─────────────────────────────────────────────────────────────┘
                            │ read-only status endpoint
                            ▼
@@ -63,10 +63,10 @@ successful snapshot indicates that the agent is unavailable. The collector
 combines these inputs to derive status. The VM's `claim.json` remains the
 source of truth for claims; the collector's claim is its latest observation.
 
-For the MVP, the collector will pull snapshots over SSH approximately every
-30 seconds; this transport is not implemented yet. The agent runs when
-invoked, without a VM daemon. Collector SSH self-observation and restricted
-Docker access still need solutions before deployment. The planned VM status
+For the MVP, the collector pulls snapshots over SSH approximately every
+30 seconds. The agent runs when invoked, without a VM daemon. A dedicated
+service account can be excluded from session observations; restricted Docker
+access remains future work. The planned VM status
 and MOTD clients read the collector's status, displaying its observation time
 and clearly reporting stale or unavailable data rather than presenting it as
 current. A local claim change may not appear until the collector receives the
@@ -92,7 +92,7 @@ next snapshot.
 | --- | --- |
 | `src/gpuboard_common/` | dependency-free models, `status.py`, `claimfile.py` |
 | `src/gpuboard_agent/` | `vm-agent`, CLI, MOTD, PAM hook (stdlib + PyYAML) |
-| `src/gpuboard_collector/` | collector service and dashboard |
+| `src/gpuboard_collector/` | collector service and read-only endpoint |
 | `agent/`, `cli/`, `motd/`, `pam/`, `collector/` | deployable assets, examples |
 | `docs/` | [documentation](docs/README.md), [roadmap](docs/ROADMAP.md) |
 | `tests/` | pytest suite with fixtures |
@@ -105,6 +105,6 @@ make install   # pip install -e ".[collector,dev]"
 make fmt lint test
 ```
 
-Status: **early development**. Status and claim-file logic and the initial
-agent snapshot are implemented; VM validation and most collector components
-remain. See the [roadmap](docs/ROADMAP.md).
+Status: **early development**. The agent, claims, collector polling and HTTP
+status endpoint are implemented; deployment validation and clients remain.
+See the [roadmap](docs/ROADMAP.md).

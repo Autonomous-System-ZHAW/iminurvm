@@ -14,9 +14,8 @@ architecture diagram and the **team rules**.
    (this also covers VS Code Remote terminals).
 6. Optional: append `pam/sshd.snippet` to `/etc/pam.d/sshd`. Disable via
    `pam_auto_claim_enabled: false` or by removing the line.
-7. SSH pull is selected for the MVP but not yet implemented. A dedicated
-   collector account and its permissions still need a deployment design,
-   including safe Docker observation and session self-observation.
+7. SSH pull uses a dedicated collector account. Exclude its session signals
+   on each agent; Docker group access is root-equivalent (see issue #7).
 8. Collector host: `pip install ".[collector]"`, copy
    `collector/collector.example.yaml` and
    `collector/gpu-board-collector.service`.
@@ -51,8 +50,7 @@ The status file is created with mode `0600`; it may contain user names,
 container labels and other sensitive information. The target directory must
 already exist. Errors propagate, and a failed replacement leaves the previous
 file in place; its `generated_at` does not update, so consumers must not
-assume an existing file is current. The public HTTP endpoint is not implemented
-yet. Do not expose this file or its contents
+assume an existing file is current. Do not expose this file or its contents
 broadly without evaluating access and data sensitivity.
 
 ## Testing one collector cycle
@@ -103,10 +101,40 @@ cycles; if reloading fails, the collector logs the failure and skips polling
 until the configuration is valid again, retrying at the last valid interval.
 An invalid or missing configuration at startup causes a nonzero exit.
 
-The loop does not serve a dashboard or HTTP endpoint yet and does not itself
-label whether existing data is stale. Do not present the file as current
-without checking its timestamps. The systemd unit is a deployment template;
-the loop and service have not yet been validated on the collector host.
+The collector also serves the read-only status endpoint described below. The
+dashboard and terminal clients are not yet implemented.
+
+## Read-only HTTP status endpoint
+
+The collector listens on `listen_host` and `listen_port` and serves
+`GET /status.json`. For example:
+
+```sh
+curl --fail-with-body --max-time 5 http://127.0.0.1:8080/status.json
+```
+
+The response contains the same `schema_version`, `generated_at` and `vms`
+fields as the status file, plus `assessed_at`, `poll_interval_seconds` and
+board `freshness`. Each VM entry has `snapshot_freshness` in addition to
+`inventory`, `status`, `snapshot` and `error`. Freshness is assessed at each
+request, not frozen at poll time; VM status itself is unchanged. HTTP 200 can
+contain stale or clock-warning data, so clients must check both freshness
+fields. The response has `Cache-Control: no-store`.
+
+Before the first successful cycle of this process, the endpoint responds with
+HTTP 503, `freshness: "UNAVAILABLE"`, `generated_at: null` and an empty `vms`
+array. This does not mean there are no VMs. The previous status file is not
+loaded after a restart. After a successful cycle, failed cycles retain the last
+board, whose freshness will become stale. Listener bind failures abort startup.
+Changes to `listen_host` or `listen_port` require a service restart; other
+configuration changes continue to reload between cycles.
+
+**Access:** this MVP endpoint has no authentication or TLS. It exposes claims,
+user and session information, container labels and VM addresses to anyone who
+can reach it. The example `listen_host: 0.0.0.0` listens on all IPv4 interfaces,
+not just a VPN. Restrict access with a firewall and network policy as needed;
+do not expose it to untrusted or public networks. Use `127.0.0.1` for local
+testing. Dashboard authentication and external access are deferred.
 
 ## Freshness assessment
 
@@ -127,15 +155,15 @@ The assessment uses the configured interval supplied by the caller and must be
 recomputed when displaying data; it is not saved in `status.json`. VM clocks
 must be synchronized for snapshot age to be meaningful. A long polling cycle
 can trigger warnings even while polling works. This logic is implemented and
-tested, but the dashboard and HTTP clients do not use it yet.
+used by the HTTP endpoint; the dashboard and HTTP clients are not implemented.
 
 The planned `vm-status` and MOTD clients display the collector's latest
 observations and derived status, with a collection timestamp. A local claim
 change can take time to reach the collector. Clients must indicate stale or
 unavailable results and use a short timeout so login is not held up; they may
 show the local claim separately, without presenting it as a collector status.
-SSH snapshot pull and the polling loop are implemented; the dashboard and
-clients are not yet.
+SSH snapshot pull, the polling loop and the endpoint are implemented; the
+dashboard and clients are not yet.
 
 ## Collector configuration
 

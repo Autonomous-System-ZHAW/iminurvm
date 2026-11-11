@@ -39,7 +39,7 @@ and simulation wrappers are deferred as optional enhancements.
    single polling cycle tested against the cluster. Continuous polling with
    retry and freshness assessment implemented; continuous polling tested on
    the cluster. Client integration of freshness remains.
-4. Read-only JSON status endpoint, followed by `/metrics`
+4. Read-only JSON status endpoint implemented; `/metrics` remains.
 5. `vm-status`, `motd.py` + `profile.d` shim: use collector status, show
    observation time and report stale/unavailable data with a short timeout
 

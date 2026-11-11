@@ -7,6 +7,7 @@ from proxmoxer.core import ResourceException
 
 from gpuboard_collector import main
 from gpuboard_collector.config import CollectorConfig
+from gpuboard_collector.web import BoardStore
 from gpuboard_common.models import BoardState, VmInventory
 from tests.conftest import NOW, make_snapshot
 
@@ -88,11 +89,50 @@ def test_main_ctrl_c_is_clean(monkeypatch) -> None:
     config = CollectorConfig()
     load = Mock(return_value=config)
     loop = Mock(side_effect=KeyboardInterrupt)
+    server = Mock()
     monkeypatch.setattr(main, "load_collector_config", load)
     monkeypatch.setattr(main, "poll_forever", loop)
+    monkeypatch.setattr(main, "make_server", Mock(return_value=server))
+    server.server_address = ("127.0.0.1", 8080)
     assert main.main(["--config", "/test/collector.yaml"]) == 0
     load.assert_called_once_with(Path("/test/collector.yaml"))
-    loop.assert_called_once_with(config, Path("/test/collector.yaml"))
+    assert loop.call_args.args[:2] == (config, Path("/test/collector.yaml"))
+    assert isinstance(loop.call_args.args[2], BoardStore)
+    server.shutdown.assert_called_once()
+    server.server_close.assert_called_once()
+
+
+def test_main_listener_failure_exits(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(
+        main, "load_collector_config", Mock(return_value=CollectorConfig())
+    )
+    monkeypatch.setattr(
+        main, "make_server", Mock(side_effect=OSError("address in use"))
+    )
+    loop = Mock()
+    monkeypatch.setattr(main, "poll_forever", loop)
+    assert main.main([]) == 1
+    assert "address in use" in caplog.text
+    loop.assert_not_called()
+
+
+def test_loop_publishes_success_and_updates_interval_on_reload(monkeypatch) -> None:
+    config = CollectorConfig(poll_interval_seconds=2)
+    updated = CollectorConfig(poll_interval_seconds=5)
+    board = BoardState(NOW)
+    store = BoardStore(2)
+    monkeypatch.setattr(main, "_poll", Mock(side_effect=[board, OSError("down")]))
+    monkeypatch.setattr(main, "load_collector_config", Mock(return_value=updated))
+
+    def wait(seconds: float) -> None:
+        assert store.read() == (board, seconds)
+        if seconds == 5:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(main.time, "sleep", wait)
+    with pytest.raises(KeyboardInterrupt):
+        main.poll_forever(config, store=store)
+    assert store.read() == (board, 5)
 
 
 def test_unexpected_error_is_not_swallowed(monkeypatch) -> None:
