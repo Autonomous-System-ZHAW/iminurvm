@@ -36,7 +36,23 @@ The in-memory merge sorts entries by node and VM ID. Stopped VMs have no
 snapshot; failed or missing pulls on running VMs produce `OFF_UNREACHABLE`
 with an error rather than `FREE`. A successful pull retains its observation
 timestamp. Duplicate VM IDs and results for unknown IDs fail the merge.
-The merge does not yet assess snapshot freshness or write `status.json`.
+The merge does not yet assess snapshot freshness.
+
+The board writer can atomically replace `status.json` with version 1 JSON:
+`schema_version`, `generated_at` (with UTC offset), and `vms`. Each VM entry
+contains `inventory` (including `vmid`, `node`, `running`, `hostpci` and
+`address`), `status`, `snapshot` (the version 1 agent snapshot or `null`),
+and `error` (`null` or an error message). The nested snapshot retains its own
+`collected_at` timestamp. A stopped VM has no snapshot or error; an
+unreachable running VM has an error and no snapshot.
+
+The status file is created with mode `0600`; it may contain user names,
+container labels and other sensitive information. The target directory must
+already exist. Errors propagate, and a failed replacement leaves the previous
+file in place; its `generated_at` does not update, so consumers must not
+assume an existing file is current. Freshness thresholds, the polling loop and
+the public HTTP endpoint are not implemented yet. Do not expose this file or
+its contents broadly without evaluating access and data sensitivity.
 
 The planned `vm-status` and MOTD clients display the collector's latest
 observations and derived status, with a collection timestamp. A local claim

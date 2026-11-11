@@ -18,6 +18,7 @@ from gpuboard_common.models import (
 from gpuboard_common.timeutil import parse_iso
 
 SNAPSHOT_SCHEMA_VERSION = 1
+BOARD_SCHEMA_VERSION = 1
 
 
 def _timestamp(value: datetime) -> str:
@@ -233,5 +234,24 @@ def snapshot_from_dict(data: dict[str, Any]) -> VmSnapshot:
 
 
 def board_to_dict(board: BoardState) -> dict[str, Any]:
-    """Convert the board state to the ``status.json`` structure."""
-    raise NotImplementedError  # TODO(phase 3)
+    """Convert a board to version 1 JSON, retaining each snapshot's schema."""
+    return {
+        "schema_version": BOARD_SCHEMA_VERSION,
+        "generated_at": _timestamp(board.generated_at),
+        "vms": [
+            {
+                "inventory": {
+                    **asdict(entry.inventory),
+                    "hostpci": list(entry.inventory.hostpci),
+                },
+                "status": entry.status.value,
+                "snapshot": (
+                    snapshot_to_dict(entry.snapshot)
+                    if entry.snapshot is not None
+                    else None
+                ),
+                "error": entry.error,
+            }
+            for entry in board.vms
+        ],
+    }

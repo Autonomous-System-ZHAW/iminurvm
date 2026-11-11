@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import os
+import tempfile
 from datetime import datetime
+from pathlib import Path
 
 from gpuboard_common.models import BoardState, VmEntry, VmInventory, VmSnapshot
+from gpuboard_common.serialize import board_to_dict
 from gpuboard_common.status import derive_status
 
 
@@ -51,6 +56,18 @@ def merge(
     return BoardState(generated_at=now, vms=entries)
 
 
-def write_status(board: BoardState, path: str) -> None:
-    """Atomically write ``status.json``."""
-    raise NotImplementedError  # TODO(phase 3)
+def write_status(board: BoardState, path: str | Path) -> None:
+    """Atomically replace status JSON with a private file; propagate failures."""
+    data = board_to_dict(board)
+    target = Path(path)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=target.parent, prefix=f".{target.name}-", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2, ensure_ascii=False, allow_nan=False)
+            handle.write("\n")
+        os.replace(tmp_name, target)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
