@@ -9,3 +9,5 @@ pam_auto_claim_enabled: true
 excluded_session_users: []
 # Set to the collector's read-only endpoint for vm-status.
 # collector_status_url: http://10.0.0.123:8080/status.json
+# Proxmox VM ID for the local login banner; set explicitly on each VM.
+# vmid: 111

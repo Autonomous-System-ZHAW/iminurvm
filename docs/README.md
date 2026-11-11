@@ -10,8 +10,7 @@ architecture diagram and the **team rules**.
 3. `pip install .` into a venv (or system-wide) and symlink the console
    scripts into `/usr/local/bin`.
 4. Copy `agent/agent.example.yaml` to `/etc/gpuboard/agent.yaml`.
-5. Install `motd/gpuboard-motd.sh` as `/etc/profile.d/gpuboard-motd.sh`
-   (this also covers VS Code Remote terminals).
+5. Install the login banner; see [MOTD setup](#login-banner-motd).
 6. Optional: append `pam/sshd.snippet` to `/etc/pam.d/sshd`. Disable via
    `pam_auto_claim_enabled: false` or by removing the line.
 7. SSH pull uses a dedicated collector account. Exclude its session signals
@@ -160,8 +159,46 @@ used by the HTTP endpoint and `vm-status`; the dashboard is not implemented.
 observations and derived status, with a collection timestamp. A local claim
 change can take time to reach the collector. See the
 [`vm-status` guide](../cli/README.md#viewing-the-collector-status).
-MOTD remains planned and should indicate stale or unavailable results and
-use a short timeout so login is not held up.
+The login banner also uses the collector observation; see below.
+
+## Login banner (MOTD)
+
+Set `collector_status_url` and the VM's explicit positive Proxmox `vmid` in
+`/etc/gpuboard/agent.yaml` on each VM. The ID is configured rather than guessed
+from hostnames or IPs. For example, on VM 111:
+
+```yaml
+collector_status_url: http://10.0.0.123:8080/status.json
+vmid: 111
+```
+
+`vm-motd` shows only that VM's collector-derived status, observed claim,
+sessions, GPU users and observation times. Both board and snapshot freshness
+are displayed. A claim belonging to another user triggers a warning, including
+if the observed claim has expired or is planned. The claim state is evaluated
+at the collector's assessment time, not against the local claim file. Data can
+lag local changes. If the collector is unavailable, the VM is missing from
+inventory, or configuration is invalid, an error is printed instead of implying
+that the VM is free.
+
+Install `motd/gpuboard-motd.sh` as `/etc/profile.d/gpuboard-motd.sh`.
+For interactive **non-login Bash** terminals (including typical VS Code
+Remote Bash terminals), also source that file from `/etc/bash.bashrc`:
+
+```sh
+. /etc/profile.d/gpuboard-motd.sh
+```
+
+Add the line only once after reviewing existing shell configuration. Verify
+other shells separately; non-login shells do not necessarily read either file.
+The script skips non-interactive shells and displays once per shell, including
+new interactive child shells such as VS Code terminals. It calls
+`/opt/gpuboard/venv/bin/vm-motd` with GNU `timeout` (3 seconds,
+plus up to 1 second to force termination), so a slow collector does not block
+shell startup indefinitely. Failures are shown but do not prevent login.
+The absolute executable path requires a root-owned installation at that
+location. Run `vm-motd` directly to test the banner, and `vm-status` to view
+all VMs.
 
 ## Collector configuration
 

@@ -23,6 +23,7 @@ class AgentConfig:
     default_claim_hours: float = 4.0
     excluded_session_users: tuple[str, ...] = ()
     collector_status_url: str | None = None
+    vmid: int | None = None
 
 
 def validate_collector_status_url(value: object) -> str:
@@ -73,6 +74,7 @@ def load_agent_config(path: Path | None = None) -> AgentConfig:
         "default_claim_hours",
         "excluded_session_users",
         "collector_status_url",
+        "vmid",
     }
     if any(not isinstance(key, str) or key not in allowed for key in data):
         raise ValueError(f"unknown agent config key in {config_path}")
@@ -109,6 +111,9 @@ def load_agent_config(path: Path | None = None) -> AgentConfig:
         raise ValueError("excluded_session_users must be a list of nonempty usernames")
     if len(set(excluded)) != len(excluded):
         raise ValueError("excluded_session_users contains duplicate usernames")
+    vmid = data.get("vmid")
+    if "vmid" in data and (type(vmid) is not int or vmid <= 0):
+        raise ValueError("vmid must be a positive integer")
     return AgentConfig(
         claim_path=claim,
         auto_claim_hours=durations["auto_claim_hours"],
@@ -121,4 +126,5 @@ def load_agent_config(path: Path | None = None) -> AgentConfig:
             if "collector_status_url" in data
             else None
         ),
+        vmid=vmid,
     )
