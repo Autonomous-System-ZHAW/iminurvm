@@ -29,8 +29,11 @@ and simulation wrappers are deferred as optional enhancements.
 
 1. Snapshot transport selected: SSH pull approximately every 30 seconds for
    the MVP; implementation and deployment details remain
-2. `proxmox.py` (inventory, `hostpci`) and SSH snapshot pull; resolve
-   collector SSH self-observation and restricted Docker access
+2. Collector configuration loader and `gpu`-tagged Proxmox inventory
+   implemented; initial inventory tested against both cluster nodes.
+   SSH snapshot pull implemented; validate against a VM and resolve SSH
+   self-observation. Docker group access accepted for the initial test;
+   investigate restricted access in issue #7.
 3. `merge.py`: derive status centrally; `status.json` and freshness tracking
 4. `web.py`: read-only per-VM status endpoint, dashboard and `/metrics`
 5. `vm-status`, `motd.py` + `profile.d` shim: use collector status, show

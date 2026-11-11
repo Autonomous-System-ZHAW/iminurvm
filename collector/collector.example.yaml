@@ -7,9 +7,10 @@ listen_port: 8080
 ssh_user: gpuboard
 ssh_key: /etc/gpuboard/id_ed25519
 ssh_timeout_seconds: 10
-agent_command: vm-agent
+agent_command: vm-agent  # single executable; use an absolute path for a venv
 
 proxmox:
+  # Include QEMU VMs tagged "gpu" on these nodes (including stopped VMs).
   nodes:
     - name: pve-a
       host: pve-a.example.org

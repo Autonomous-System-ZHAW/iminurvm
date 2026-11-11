@@ -40,6 +40,52 @@ show the local claim separately, without presenting it as a collector status.
 Status freshness thresholds have not been decided. The MVP will use SSH pull
 for snapshots, but the collector transport is not yet implemented.
 
+## Collector configuration
+
+The collector configuration loader reads `collector/collector.example.yaml`
+as its example format. It uses `/etc/gpuboard/collector.yaml` by default, or an
+explicit path; a missing file is an error. At least one Proxmox node is
+required, with a unique node name, host, token ID and absolute token secret
+file path. `verify_ssl` defaults to `true`; disabling TLS verification is
+insecure and should only be used deliberately in a controlled test.
+
+The `vm_addresses` mapping accepts numeric VM IDs and quoted decimal VM IDs;
+values are SSH addresses. Other SSH, polling, status-file and web-listener
+settings use the defaults shown in the example when omitted. Paths must be
+absolute, timeouts and polling intervals must be finite and positive, and the
+listener port must be between 1 and 65535. Unknown fields, duplicate YAML
+keys, duplicate node names and duplicate VM IDs are rejected.
+
+Loading configuration does not read the token files, check file permissions,
+contact Proxmox or establish SSH connections. The collector service, inventory
+poll loop and snapshot transport are not implemented yet; validation does not
+prove a configuration will connect successfully.
+
+## Proxmox inventory
+
+The inventory reader requests each configured node's QEMU VM list and each
+VM's configuration using a read-only API token. It includes a VM only when its
+configuration has the exact Proxmox tag `gpu`, including stopped VMs and VMs
+without a `hostpci` entry. Add that tag to each VM intended for the board;
+an untagged VM is not included. Other tags do not count as `gpu`.
+
+All `hostpci` values for selected VMs are recorded in numeric slot order.
+The `x-vga` option marks a primary GPU, but is not required for GPU compute
+passthrough and is not used as a filter. PCI passthrough alone does not prove
+the device is a GPU; the agent reports the GPU model separately. An unnamed VM
+is displayed as `VM <id>`. Explicit `vm_addresses` are attached to matching
+VMs for the future SSH pull.
+
+The reader requires access to the VM list and configuration for every VM it
+can see, including untagged VMs, because tags are read from configuration.
+Errors reading a node or VM configuration fail the inventory request instead
+of returning an incomplete successful result. Permissions can limit which VMs
+the API lists; check the token's effective visibility on each node. A VM
+migrating between node requests can lead to missing or duplicate observations;
+duplicate IDs are rejected and must be retried. The implementation uses a
+10-second API request timeout. It has only been tested with mocked responses,
+not against the real cluster.
+
 ## Agent snapshot
 
 Run `vm-agent` for one JSON snapshot, or `vm-agent --config /path/agent.yaml`
@@ -106,9 +152,35 @@ Only running Docker containers are listed.
 
 The agent needs Docker API access to list and inspect containers. Membership in
 the Docker socket group effectively grants root-level control of the host;
-do not grant it casually to all users. An appropriately restricted Docker API
-proxy or a dedicated privileged collection mechanism needs to be evaluated
-before deployment.
+do not grant it casually to all users. For the initial proof of concept, a
+dedicated collector account may be granted Docker group access on the test VM.
+Treat its SSH key and account as root-equivalent: the VPN reduces exposure but
+does not limit Docker privileges. Restrict key access and do not share the
+account. A restricted Docker API proxy or dedicated privileged observer is a
+future investigation: [issue #7](https://github.com/Autonomous-System-ZHAW/iminurvm/issues/7).
+
+## SSH snapshot pull
+
+The collector's SSH pull functions connect to running VMs with explicit
+`vm_addresses` mappings; they do not guess an address from the VM name. The
+SSH user, key, executable and timeout come from collector configuration.
+`agent_command` is a single executable name or path, not a shell command with
+arguments; use an absolute path when the agent is in a virtual environment.
+The timeout bounds the entire SSH invocation, including the agent's collection,
+so increase it if real-world collection takes longer.
+
+The collector uses noninteractive public-key SSH and strict host-key checking.
+Install and independently verify each VM's host key in the collector
+account's known-hosts file before connecting. On success, agent stderr is
+logged as a warning and JSON is validated against the snapshot schema. A
+missing address, connection error, timeout, nonzero agent exit or invalid
+snapshot is an error for that VM; stopped VMs are not contacted. Pulls run
+concurrently with at most eight workers.
+
+The SSH connection itself may be reported as a user session and can affect
+status and cleanup. It is not filtered yet: resolve this before relying on
+collector status or deploying periodic polling. The collector poll loop is
+also not implemented, and SSH pull has not been tested against a VM.
 
 ## GPU observation
 
