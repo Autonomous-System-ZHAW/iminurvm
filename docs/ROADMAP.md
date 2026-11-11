@@ -25,7 +25,7 @@ Phase 0 (this scaffold): layout, tooling, models, `status.py`, `claimfile.py`.
 The basic claim workflow and cleanup are the priority. Process-bound claims
 and simulation wrappers are deferred as optional enhancements.
 
-## Phase 3 — collector and dashboard
+## Phase 3 — collector and clients
 
 1. Snapshot transport selected: SSH pull approximately every 30 seconds for
    the MVP; implementation and deployment details remain
@@ -37,8 +37,9 @@ and simulation wrappers are deferred as optional enhancements.
    investigate restricted access in issue #7.
 3. In-memory merge, status derivation, atomic `status.json` writing and a
    single polling cycle tested against the cluster. Continuous polling with
-   retry is implemented; test it against the cluster. Freshness tracking remains.
-4. `web.py`: read-only per-VM status endpoint, dashboard and `/metrics`
+   retry and freshness assessment implemented; continuous polling tested on
+   the cluster. Client integration of freshness remains.
+4. Read-only JSON status endpoint, followed by `/metrics`
 5. `vm-status`, `motd.py` + `profile.d` shim: use collector status, show
    observation time and report stale/unavailable data with a short timeout
 
@@ -52,6 +53,6 @@ and simulation wrappers are deferred as optional enhancements.
 1. Future reservations (planned claims, "from 14:30: alice", MOTD handover
    warning 40 min before)
 2. OIDC authentication (Pocket ID)
-3. Claim button in the dashboard
+3. Browser dashboard and claim button (dashboard tracked in issue #8)
 4. `vm-run` (`kind: run`, auto-release on exit)
 5. `sim-start` / `sim-stop` label wrappers

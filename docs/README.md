@@ -36,7 +36,8 @@ The in-memory merge sorts entries by node and VM ID. Stopped VMs have no
 snapshot; failed or missing pulls on running VMs produce `OFF_UNREACHABLE`
 with an error rather than `FREE`. A successful pull retains its observation
 timestamp. Duplicate VM IDs and results for unknown IDs fail the merge.
-The merge does not yet assess snapshot freshness.
+The merge retains observation timestamps but does not change VM statuses based
+on freshness.
 
 The board writer can atomically replace `status.json` with version 1 JSON:
 `schema_version`, `generated_at` (with UTC offset), and `vms`. Each VM entry
@@ -50,8 +51,8 @@ The status file is created with mode `0600`; it may contain user names,
 container labels and other sensitive information. The target directory must
 already exist. Errors propagate, and a failed replacement leaves the previous
 file in place; its `generated_at` does not update, so consumers must not
-assume an existing file is current. Freshness thresholds and the public HTTP
-endpoint are not implemented yet. Do not expose this file or its contents
+assume an existing file is current. The public HTTP endpoint is not implemented
+yet. Do not expose this file or its contents
 broadly without evaluating access and data sensitivity.
 
 ## Testing one collector cycle
@@ -102,18 +103,39 @@ cycles; if reloading fails, the collector logs the failure and skips polling
 until the configuration is valid again, retrying at the last valid interval.
 An invalid or missing configuration at startup causes a nonzero exit.
 
-The loop does not serve a dashboard or HTTP endpoint yet and does not determine
-whether existing data is stale. Do not present the file as current without
-checking its timestamps. The systemd unit is a deployment template; the loop
-and service have not yet been validated on the collector host.
+The loop does not serve a dashboard or HTTP endpoint yet and does not itself
+label whether existing data is stale. Do not present the file as current
+without checking its timestamps. The systemd unit is a deployment template;
+the loop and service have not yet been validated on the collector host.
+
+## Freshness assessment
+
+The collector provides a separate freshness assessment for the board and each
+VM snapshot. At read time, an observation is `STALE` when its age is greater
+than three current polling intervals (90 seconds with the default interval).
+An observation more than 30 seconds in the future is `CLOCK_WARNING`; up to
+and including 30 seconds is tolerated. These are elapsed-time comparisons,
+including across daylight-saving transitions.
+
+A running VM with no snapshot is `UNAVAILABLE`; a stopped VM's snapshot
+freshness is `NOT_APPLICABLE`. A missing board is also `UNAVAILABLE`. Freshness
+does not change VM statuses, and a fresh board does not imply each VM snapshot
+is fresh. If the board itself is stale, all its entries are based on old
+inventory even if a snapshot individually appears fresh.
+
+The assessment uses the configured interval supplied by the caller and must be
+recomputed when displaying data; it is not saved in `status.json`. VM clocks
+must be synchronized for snapshot age to be meaningful. A long polling cycle
+can trigger warnings even while polling works. This logic is implemented and
+tested, but the dashboard and HTTP clients do not use it yet.
 
 The planned `vm-status` and MOTD clients display the collector's latest
 observations and derived status, with a collection timestamp. A local claim
 change can take time to reach the collector. Clients must indicate stale or
 unavailable results and use a short timeout so login is not held up; they may
 show the local claim separately, without presenting it as a collector status.
-Status freshness thresholds have not been decided. SSH snapshot pull and the
-polling loop are implemented; the dashboard and clients are not yet.
+SSH snapshot pull and the polling loop are implemented; the dashboard and
+clients are not yet.
 
 ## Collector configuration
 
