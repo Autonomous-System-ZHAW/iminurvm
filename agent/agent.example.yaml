@@ -2,5 +2,5 @@
 claim_path: /var/lib/gpuboard/claim.json
 default_claim_hours: 4
 auto_claim_hours: 4        # PAM soft claim duration (kind "auto")
-idle_grace_minutes: 30     # expired + idle claims are removed after this
+idle_grace_minutes: 30     # wait after expiry, then remove only if idle
 pam_auto_claim_enabled: true

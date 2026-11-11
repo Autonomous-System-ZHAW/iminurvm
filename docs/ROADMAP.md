@@ -18,18 +18,19 @@ Phase 0 (this scaffold): layout, tooling, models, `status.py`, `claimfile.py`.
 ## Phase 2 — claim commands and cleanup
 
 1. `parse_duration`, `vm-claim`, `vm-extend`, `vm-release` implemented;
-   validate on a VM
-2. `cleanup.py` + systemd timer (idle grace period)
+   initial VM test confirmed an existing claim cannot be overwritten by
+   another user; broader command and permission validation remain
+2. `cleanup.py` + systemd timer implemented; validate on a VM
 
 The basic claim workflow and cleanup are the priority. Process-bound claims
 and simulation wrappers are deferred as optional enhancements.
 
 ## Phase 3 — collector and dashboard
 
-1. Decide snapshot transport: SSH pull is the original plan; HTTP push and
-   MQTT are alternatives. Push requires a VM service, authentication and
-   heartbeat/reconnect handling.
-2. `proxmox.py` (inventory, `hostpci`) and snapshot transport
+1. Snapshot transport selected: SSH pull approximately every 30 seconds for
+   the MVP; implementation and deployment details remain
+2. `proxmox.py` (inventory, `hostpci`) and SSH snapshot pull; resolve
+   collector SSH self-observation and restricted Docker access
 3. `merge.py`: derive status centrally; `status.json` and freshness tracking
 4. `web.py`: read-only per-VM status endpoint, dashboard and `/metrics`
 5. `vm-status`, `motd.py` + `profile.d` shim: use collector status, show

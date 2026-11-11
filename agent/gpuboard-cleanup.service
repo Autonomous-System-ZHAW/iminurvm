@@ -1,0 +1,7 @@
+[Unit]
+Description=Clean up idle expired gpu-board claims
+After=systemd-logind.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/gpuboard/venv/bin/vm-cleanup

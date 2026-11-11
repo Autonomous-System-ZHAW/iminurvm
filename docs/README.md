@@ -14,8 +14,9 @@ architecture diagram and the **team rules**.
    (this also covers VS Code Remote terminals).
 6. Optional: append `pam/sshd.snippet` to `/etc/pam.d/sshd`. Disable via
    `pam_auto_claim_enabled: false` or by removing the line.
-7. If using SSH pull, create an unprivileged `gpuboard` user for the collector;
-   it only needs to run `vm-agent`. The transport is still under consideration.
+7. SSH pull is selected for the MVP but not yet implemented. A dedicated
+   collector account and its permissions still need a deployment design,
+   including safe Docker observation and session self-observation.
 8. Collector host: `pip install ".[collector]"`, copy
    `collector/collector.example.yaml` and
    `collector/gpu-board-collector.service`.
@@ -36,7 +37,8 @@ observations and derived status, with a collection timestamp. A local claim
 change can take time to reach the collector. Clients must indicate stale or
 unavailable results and use a short timeout so login is not held up; they may
 show the local claim separately, without presenting it as a collector status.
-Status freshness thresholds and the snapshot transport have not been decided.
+Status freshness thresholds have not been decided. The MVP will use SSH pull
+for snapshots, but the collector transport is not yet implemented.
 
 ## Agent snapshot
 
@@ -80,8 +82,8 @@ permissions can limit visibility. `merge_vscode_sessions()` keeps login
 sessions intact and adds one `vscode` entry per detected user; this entry is a
 process signal, not a confirmed login. The current status rules count that
 entry as activity, so a lingering process can prevent a VM from appearing
-free. With SSH pull, the
-collector's own SSH login may appear as a session; filtering service accounts
+free. With SSH pull, the collector's own SSH login may appear as a session;
+filtering service accounts
 and handling that self-observation still need a design before status collection
 is integrated.
 
@@ -140,7 +142,9 @@ Only writing the claim needs more than user rights. Simplest sound option:
   modifying a claim. This is cooperative, not access control.
 - No sticky bit: anybody may extend or release a claim (this is a social
   system; `vm-release` of a foreign claim requires `--force`).
-- The PAM hook runs as root; everything else runs unprivileged.
+- The cleanup service runs as root for process visibility and claim access.
+  Keep its installation and configuration root-owned. The PAM hook also runs
+  as root; normal user commands run unprivileged.
 
 ## Claim file format
 

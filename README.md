@@ -24,14 +24,18 @@ GPU usage (mapped to user and Docker container), and the claim.
 
 | Status | Condition |
 | --- | --- |
-| FREE | no claim, no GPU processes, no sessions |
+| FREE | no active claim and no detected GPU processes or sessions |
 | CLAIMED | active claim; no GPU process of another user |
 | CLAIM_EXPIRED | claim ended but owner still has sessions/processes |
-| UNCLAIMED_USAGE | sessions or GPU processes exist but there is no claim |
+| UNCLAIMED_USAGE | activity exists without an active claim, including an expired claim when only other users are active |
 | CONFLICT | GPU processes from a user other than the claim owner |
 | OFF_UNREACHABLE | Proxmox reports VM stopped, or agent not reachable |
 
 The precise rules live in [`status.py`](src/gpuboard_common/status.py).
+These rules are implemented, but the collector and dashboard are not yet.
+An expired claim file can remain even when the derived status is `FREE`, so
+`FREE` does not guarantee that `vm-claim` will accept a new claim. See
+[expired claims and blocked claims](cli/README.md#expired-claims-and-blocked-claims).
 
 ## Architecture
 
@@ -59,10 +63,10 @@ successful snapshot indicates that the agent is unavailable. The collector
 combines these inputs to derive status. The VM's `claim.json` remains the
 source of truth for claims; the collector's claim is its latest observation.
 
-SSH pull every 30 seconds is the original transport plan, not an implemented
-feature. HTTP push or MQTT are alternatives still under consideration. A push
-design would require a background service on each VM; the original SSH agent
-would run only when invoked. Regardless of transport, the planned VM status
+For the MVP, the collector will pull snapshots over SSH approximately every
+30 seconds; this transport is not implemented yet. The agent runs when
+invoked, without a VM daemon. Collector SSH self-observation and restricted
+Docker access still need solutions before deployment. The planned VM status
 and MOTD clients read the collector's status, displaying its observation time
 and clearly reporting stale or unavailable data rather than presenting it as
 current. A local claim change may not appear until the collector receives the
@@ -74,9 +78,11 @@ next snapshot.
    expiry.
 2. Never stop containers or processes of other users without asking — even at
    0 % GPU utilization.
-3. Claims always expire. Extend actively if you need longer. Expired claims
-   with no sessions and no GPU processes are cleaned up automatically after an
-   idle grace period (default 30 min).
+3. Claims always expire. Extend actively if you need longer. Once expired for
+   the configured grace period (default 30 min), claims are cleaned up if no
+   sessions, VS Code server processes or GPU compute processes are detected.
+   Running containers without GPU compute activity do not prevent cleanup.
+   See the [cleanup guide](agent/README.md#expired-claim-cleanup) for limits.
 
 ## Repository layout
 
