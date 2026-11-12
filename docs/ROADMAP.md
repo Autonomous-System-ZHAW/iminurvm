@@ -31,7 +31,7 @@ and simulation wrappers are deferred as optional enhancements.
    the MVP; implementation and deployment details remain
 2. Collector configuration loader and `gpu`-tagged Proxmox inventory
    implemented; initial inventory tested against both cluster nodes.
-   Single SSH snapshot pull tested against VM 111. Opt-in service-account
+   Single SSH snapshot pull tested against a GPU VM. Opt-in service-account
    session exclusion validated in a VM snapshot. Docker group access
    accepted for the initial test;
    investigate restricted access in issue #7.
@@ -39,9 +39,10 @@ and simulation wrappers are deferred as optional enhancements.
    single polling cycle tested against the cluster. Continuous polling with
    retry and freshness assessment implemented; continuous polling tested on
    the cluster. Client integration of freshness remains.
-4. Read-only JSON status endpoint implemented; `/metrics` remains.
+4. Read-only JSON status endpoint and MVP dashboard implemented; `/metrics`
+   remains.
 5. `vm-status` and the collector-backed MOTD implemented; validate the
-   login and VS Code hooks on VM 111.
+   login and VS Code hooks on additional VMs.
 
 ## Phase 4 — VM rollout
 
@@ -53,6 +54,6 @@ and simulation wrappers are deferred as optional enhancements.
 1. Future reservations (planned claims, "from 14:30: alice", MOTD handover
    warning 40 min before)
 2. OIDC authentication (Pocket ID)
-3. Browser dashboard and claim button (dashboard tracked in issue #8)
+3. Modern frontend improvements (#8) and authenticated claim management (#12)
 4. `vm-run` (`kind: run`, auto-release on exit)
 5. `sim-start` / `sim-stop` label wrappers

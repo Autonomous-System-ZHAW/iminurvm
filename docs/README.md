@@ -3,7 +3,11 @@
 See the [top-level README](../README.md) for context, status table,
 architecture diagram and the **team rules**.
 
-## Install guide (target state, filled in during phase 4)
+## Installation
+
+For step-by-step MVP deployment to an existing GPU VM and adding it to a
+working collector, use the [GPU VM onboarding guide](onboarding.md). The
+following is an architecture checklist, not a complete installation:
 
 1. Create the `vm-claim` group and add every personal account to it.
 2. `install -d -m 2775 -o root -g vm-claim /var/lib/gpuboard`
@@ -100,7 +104,26 @@ cycles; if reloading fails, the collector logs the failure and skips polling
 until the configuration is valid again, retrying at the last valid interval.
 An invalid or missing configuration at startup causes a nonzero exit.
 
-The collector also serves the read-only status endpoint described below.
+The collector also serves the read-only dashboard and status endpoint
+described below.
+
+## Read-only dashboard
+
+Open `http://<collector-address>:8080/` from a machine that can reach the
+collector. The dashboard refreshes every 30 seconds and displays inventory,
+claims, activity, errors and both board and snapshot freshness. Click a VM's
+details to see sessions, GPU compute processes and running containers.
+`OFF` means Proxmox reported the VM stopped; `UNREACHABLE` means a running VM
+has no usable snapshot. A stale board makes all rows potentially outdated,
+even when an individual snapshot appears fresh. Before the first successful
+poll the page reports unavailability (HTTP 503); it is not an empty board.
+
+The page is server-rendered and requires no JavaScript. It is an MVP, not the
+future modern frontend. It cannot change claims or log users in. Like the
+JSON endpoint, it has **no authentication or TLS** and is accessible to
+anyone who can reach the collector's listener. Restrict its network exposure;
+do not expose it to untrusted or public networks. Authentication and web claim
+management are deferred to issue #12.
 
 ## Read-only HTTP status endpoint
 
@@ -153,7 +176,7 @@ The assessment uses the configured interval supplied by the caller and must be
 recomputed when displaying data; it is not saved in `status.json`. VM clocks
 must be synchronized for snapshot age to be meaningful. A long polling cycle
 can trigger warnings even while polling works. This logic is implemented and
-used by the HTTP endpoint and `vm-status`; the dashboard is not implemented.
+used by the HTTP endpoint, dashboard and `vm-status`.
 
 `vm-status` displays the collector's latest
 observations and derived status, with a collection timestamp. A local claim
@@ -165,12 +188,15 @@ The login banner also uses the collector observation; see below.
 
 Set `collector_status_url` and the VM's explicit positive Proxmox `vmid` in
 `/etc/gpuboard/agent.yaml` on each VM. The ID is configured rather than guessed
-from hostnames or IPs. For example, on VM 111:
+from hostnames or IPs. For example, with a fictional VM ID and
+documentation-only IP address:
 
 ```yaml
-collector_status_url: http://10.0.0.123:8080/status.json
-vmid: 111
+collector_status_url: http://192.0.2.10:8080/status.json
+vmid: 901
 ```
+
+Replace the example ID and URL with your actual values.
 
 `vm-motd` shows only that VM's collector-derived status, observed claim,
 sessions, GPU users and observation times. Both board and snapshot freshness
@@ -309,7 +335,7 @@ this option. Keep the config administrator-controlled and verify filtering on
 each VM before relying on it.
 
 If a process UID has no username in the VM's user database, the agent reports
-it as `uid:<number>` (for example `uid:1234`) and logs a warning on stderr.
+it as `uid:<number>` (for example `uid:2345`) and logs a warning on stderr.
 This marker identifies a numeric UID, not the person using the process. It
 applies both to VS Code process signals and GPU process users; container user
 accounts do not necessarily exist on the VM. Even a mapped host username may
@@ -355,7 +381,7 @@ concurrently with at most eight workers.
 An SSH connection can appear as a user session. Set `excluded_session_users`
 on the VM for a dedicated collector account as described above; verify the
 agent and cleanup use the same configuration. A single SSH pull and session
-exclusion have been tested on VM 111; cleanup with the exclusion still needs
+exclusion have been tested on one VM; cleanup with the exclusion still needs
 real-VM validation.
 
 ## GPU observation

@@ -10,17 +10,18 @@ Configure the collector's status endpoint on each VM in
 `/etc/gpuboard/agent.yaml` (keep existing settings):
 
 ```yaml
-collector_status_url: http://10.0.0.123:8080/status.json
+collector_status_url: http://192.0.2.10:8080/status.json
 ```
 
-Replace the example address with your collector's address. Then run:
+The address is reserved for documentation; replace it with your collector's
+address. Then run:
 
 ```sh
 vm-status
 vm-status --verbose
 vm-status --color never
 vm-status --json
-vm-status --url http://10.0.0.123:8080/status.json
+vm-status --url http://192.0.2.10:8080/status.json
 ```
 
 The compact table shows all VMs, claim owner, observed session and GPU users,

@@ -4,6 +4,9 @@ Deployment assets for the per-VM agent. Code: `src/gpuboard_agent/`
 (`vm-agent`, collectors in `sessions.py`, `gpu.py`, `docker.py`).
 Example config: `agent.example.yaml`.
 
+For a complete VM and collector-side installation walkthrough, see the
+[GPU VM onboarding guide](../docs/onboarding.md).
+
 ## Expired-claim cleanup
 
 `vm-cleanup` checks the configured claim once. It removes it only after

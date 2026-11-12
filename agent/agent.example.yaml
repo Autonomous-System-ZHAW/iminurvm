@@ -8,6 +8,6 @@ pam_auto_claim_enabled: true
 # GPU processes remain visible and still prevent cleanup.
 excluded_session_users: []
 # Set to the collector's read-only endpoint for vm-status.
-# collector_status_url: http://10.0.0.123:8080/status.json
+# collector_status_url: http://192.0.2.10:8080/status.json  # documentation address
 # Proxmox VM ID for the local login banner; set explicitly on each VM.
-# vmid: 111
+# vmid: 901

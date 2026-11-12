@@ -1,13 +1,22 @@
-"""Read-only HTTP status endpoint."""
+"""Read-only HTTP dashboard and status endpoint."""
 
 from __future__ import annotations
 
 import json
 import logging
 import threading
+from functools import lru_cache
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+
+from jinja2 import (
+    Environment,
+    PackageLoader,
+    Template,
+    TemplateError,
+    select_autoescape,
+)
 
 from gpuboard_collector.freshness import assess_board
 from gpuboard_common.models import BoardState
@@ -15,6 +24,20 @@ from gpuboard_common.serialize import BOARD_SCHEMA_VERSION, board_to_dict
 from gpuboard_common.timeutil import now
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _dashboard_template() -> Template:
+    environment = Environment(
+        loader=PackageLoader("gpuboard_collector", "templates"),
+        autoescape=select_autoescape(default=True),
+    )
+    return environment.get_template("dashboard.html.j2")
+
+
+def render_dashboard(board: dict[str, Any]) -> str:
+    """Render a read-only board from the same observation as the JSON endpoint."""
+    return _dashboard_template().render(board=board)
 
 
 class BoardStore:
@@ -75,22 +98,36 @@ def make_server(host: str, port: int, store: BoardStore) -> ThreadingHTTPServer:
             self.connection.settimeout(10)
 
         def do_GET(self) -> None:
-            if self.path != "/status.json":
+            if self.path not in ("/", "/status.json"):
                 self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
                 return
             try:
                 code, data = status_response(store)
-                self._send(code, data)
-            except (ValueError, TypeError, OverflowError):
+                if self.path == "/":
+                    self._send_body(
+                        code, render_dashboard(data).encode("utf-8"), "text/html"
+                    )
+                else:
+                    self._send(code, data)
+            except (ValueError, TypeError, OverflowError, TemplateError):
                 logger.exception("Failed to render status response")
                 self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "status error"})
 
         def _send(self, code: HTTPStatus, data: dict[str, Any]) -> None:
             body = json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
+            self._send_body(code, body, "application/json")
+
+        def _send_body(self, code: HTTPStatus, body: bytes, content_type: str) -> None:
             self.send_response(code)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'none'; style-src 'unsafe-inline'; "
+                "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            )
             self.end_headers()
             self.wfile.write(body)
 

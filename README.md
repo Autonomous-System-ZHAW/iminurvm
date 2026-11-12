@@ -32,7 +32,7 @@ GPU usage (mapped to user and Docker container), and the claim.
 | OFF_UNREACHABLE | Proxmox reports VM stopped, or agent not reachable |
 
 The precise rules live in [`status.py`](src/gpuboard_common/status.py).
-These rules and the collector are implemented; the browser dashboard is deferred.
+These rules, the collector and a read-only MVP dashboard are implemented.
 An expired claim file can remain even when the derived status is `FREE`, so
 `FREE` does not guarantee that `vm-claim` will accept a new claim. See
 [expired claims and blocked claims](cli/README.md#expired-claims-and-blocked-claims).
@@ -48,8 +48,8 @@ An expired claim file can remain even when the derived status is `FREE`, so
                ▼                                   ▼
         ┌──────────── Collector (small LXC / VM "gpu-board") ─────────┐
         │  merge inventory + snapshots; derive status centrally       │
-        │  → status.json and read-only HTTP status endpoint            │
-        │  → dashboard and /metrics (planned)                         │
+        │  → status.json, read-only HTTP endpoint and dashboard       │
+        │  → /metrics (planned)                                       │
         └─────────────────────────────────────────────────────────────┘
                            │ read-only status endpoint
                            ▼
@@ -66,11 +66,16 @@ source of truth for claims; the collector's claim is its latest observation.
 For the MVP, the collector pulls snapshots over SSH approximately every
 30 seconds. The agent runs when invoked, without a VM daemon. A dedicated
 service account can be excluded from session observations; restricted Docker
-access remains future work. The planned VM status
+access remains future work. The VM status
 and MOTD clients read the collector's status, displaying its observation time
 and clearly reporting stale or unavailable data rather than presenting it as
 current. A local claim change may not appear until the collector receives the
 next snapshot.
+
+The dashboard at the collector's `/` URL is read-only and unauthenticated, as
+is `/status.json`. Both expose potentially sensitive operational data; restrict
+network access and do not expose them publicly. Future authentication and web
+claim management are tracked in issue #12.
 
 ## Team rules
 
@@ -98,6 +103,9 @@ next snapshot.
 | `tests/` | pytest suite with fixtures |
 
 ## Development
+
+For a step-by-step VM rollout, see the
+[GPU VM onboarding guide](docs/onboarding.md).
 
 ```sh
 python -m venv .venv && . .venv/bin/activate

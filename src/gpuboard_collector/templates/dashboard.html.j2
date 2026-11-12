@@ -2,11 +2,106 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="refresh" content="30">
-  <title>gpu-board</title>
+  <title>GPU Board</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0c1220; color: #e4ecf7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1440px; margin: auto; padding: 2rem clamp(1rem, 3vw, 3rem); }
+    h1 { margin: .25rem 0; font-size: clamp(1.7rem, 4vw, 2.4rem); letter-spacing: -.04em; }
+    h2 { font-size: 1.1rem; margin: 0; }
+    p { line-height: 1.5; }
+    .eyebrow { color: #8cb8fc; font-size: .75rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+    .muted, .meta { color: #a7b6ca; font-size: .9rem; }
+    .intro { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: end; }
+    .info, .notice { margin: 1.4rem 0; padding: 1rem 1.2rem; background: #151f31; border: 1px solid #293a53; border-radius: .8rem; }
+    .notice { border-color: #b7791f; background: #392b19; color: #ffdda0; }
+    .badge { display: inline-block; padding: .3rem .6rem; border-radius: 999px; font-size: .76rem; font-weight: 700; background: #26354a; color: #d3deeb; }
+    .fresh, .free { color: #a4f3c1; background: #174335; }
+    .claimed { color: #b8d7ff; background: #1d4167; }
+    .stale, .claim_expired, .unclaimed_usage { color: #ffe3a3; background: #61451c; }
+    .clock_warning, .conflict, .unavailable { color: #ffc1c1; background: #642b32; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 1rem; }
+    .card { background: #151f31; border: 1px solid #293a53; border-radius: .9rem; padding: 1.1rem; min-width: 0; overflow-wrap: anywhere; }
+    .card-head { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
+    dl { display: grid; grid-template-columns: 6rem 1fr; gap: .5rem; margin: 1rem 0 0; font-size: .9rem; }
+    dt { color: #a7b6ca; } dd { margin: 0; }
+    details { margin-top: 1rem; border-top: 1px solid #293a53; padding-top: .8rem; font-size: .9rem; }
+    summary { cursor: pointer; color: #a9ccff; }
+    ul { padding-left: 1.25rem; } li { margin: .35rem 0; }
+    .error { color: #ffc1c1; }
+    footer { margin-top: 2rem; color: #a7b6ca; font-size: .85rem; }
+    a { color: #a9ccff; }
+  </style>
 </head>
 <body>
-  <!-- TODO(phase 3): table of VMs: status, owner, project, until, users, GPU -->
-  <h1>gpu-board</h1>
+<main>
+  <header class="intro">
+    <div><div class="eyebrow">Shared compute / overview</div><h1>GPU Board</h1>
+      <div class="muted">VM ownership and observed activity &middot; read-only</div></div>
+    <div class="meta">Refreshes every 30 seconds &middot; <a href="/status.json">JSON</a></div>
+  </header>
+
+  <section class="info" aria-label="Board freshness">
+    <strong>Board</strong>
+    <span class="badge {{ board.freshness|lower }}">{{ board.freshness }}</span>
+    {% if board.generated_at %}<span class="meta"> Generated: {{ board.generated_at }} &middot; Assessed: {{ board.assessed_at }}</span>{% endif %}
+  </section>
+  {% if board.freshness == "UNAVAILABLE" %}
+    <section class="notice" role="alert"><strong>Board unavailable.</strong> The collector has not completed a successful poll. This does not mean the VMs are free. Retrying automatically.</section>
+  {% elif board.freshness != "FRESH" %}
+    <section class="notice" role="alert"><strong>Board {{ board.freshness }}.</strong> Inventory and statuses may not be current. Check the collector and clocks before relying on this information.</section>
+  {% endif %}
+
+  {% if board.generated_at and not board.vms %}
+    <p class="muted">No VMs in the collector inventory.</p>
+  {% endif %}
+  <section class="grid" aria-label="GPU virtual machines">
+  {% for vm in board.vms %}
+    {% set snap = vm.snapshot %}
+    {% set claim = snap.claim if snap else none %}
+    {% if vm.status == "OFF_UNREACHABLE" %}
+      {% set label = "UNREACHABLE" if vm.inventory.running else "OFF" %}
+    {% else %}
+      {% set label = vm.status %}
+    {% endif %}
+    <article class="card">
+      <div class="card-head">
+        <div><div class="eyebrow">VM {{ vm.inventory.vmid }} &middot; {{ vm.inventory.node }}</div><h2>{{ vm.inventory.name }}</h2></div>
+        <span class="badge {{ (('unavailable' if vm.inventory.running else 'off') if vm.status == 'OFF_UNREACHABLE' else vm.status|lower) }}">{{ label }}</span>
+      </div>
+      <dl>
+        <dt>Snapshot</dt><dd><span class="badge {{ vm.snapshot_freshness|lower }}">{{ vm.snapshot_freshness }}</span></dd>
+        <dt>GPU</dt><dd>{{ snap.gpu_model or "Unknown" if snap else "Unavailable" }}</dd>
+        <dt>Claim</dt><dd>{% if claim %}{{ claim.owner }} &middot; {{ claim.project or "No project" }}{% elif snap %}None observed{% else %}Unavailable{% endif %}</dd>
+        {% if claim %}
+          <dt>From</dt><dd>{{ claim.start }}</dd>
+          <dt>Until</dt><dd>{{ claim.end }}</dd>
+          {% if claim.message %}<dt>Message</dt><dd>{{ claim.message }}</dd>{% endif %}
+        {% endif %}
+        {% if snap %}<dt>Observed</dt><dd>{{ snap.collected_at }}</dd>{% endif %}
+      </dl>
+      {% if vm.snapshot_freshness in ("STALE", "CLOCK_WARNING", "UNAVAILABLE") %}
+        <p class="error"><strong>Observation {{ vm.snapshot_freshness }}.</strong> Do not assume this VM is free.</p>
+      {% endif %}
+      {% if vm.error %}<p class="error">Collection error: {{ vm.error }}</p>{% endif %}
+      {% if snap %}
+      <details>
+        <summary>Sessions, GPU processes and containers</summary>
+        <strong>Sessions</strong>
+        {% if snap.sessions %}<ul>{% for s in snap.sessions %}<li>{{ s.user }} &middot; {{ s.kind }}{% if s.tty %} &middot; {{ s.tty }}{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">None observed</p>{% endif %}
+        <strong>GPU compute processes</strong>
+        {% if snap.gpu_processes %}<ul>{% for p in snap.gpu_processes %}<li>{{ p.container_owner or p.user }} &middot; PID {{ p.pid }}{% if p.name %} &middot; {{ p.name }}{% endif %}{% if p.gpu_memory_mib is not none %} &middot; {{ p.gpu_memory_mib }} MiB{% endif %}{% if p.container %} &middot; container {{ p.container }}{% endif %}{% if p.container_project %} &middot; project {{ p.container_project }}{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">None observed</p>{% endif %}
+        <strong>Running containers</strong>
+        {% if snap.containers %}<ul>{% for c in snap.containers %}<li>{{ c.name }}{% if c.labels.get("owner") %} &middot; owner {{ c.labels.get("owner") }}{% endif %}{% if c.labels.get("project") %} &middot; project {{ c.labels.get("project") }}{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">None observed</p>{% endif %}
+      </details>
+      {% endif %}
+    </article>
+  {% endfor %}
+  </section>
+  <footer>Claims are social reservations, not enforcement. Never stop another user's work without asking. Observations can lag behind local changes.</footer>
+</main>
 </body>
 </html>
