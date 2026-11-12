@@ -285,7 +285,6 @@ ownership/modes of its home, `.ssh` directory and `authorized_keys`.
 On the **collector**, verify the exact non-interactive pull and JSON output:
 
 ```sh
-umask 077
 CHECK_FILE=$(mktemp "$HOME/gpuboard-snapshot.XXXXXX")
 sudo -u gpuboard -H ssh -T -o BatchMode=yes \
   -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes \
@@ -304,7 +303,8 @@ python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("hostname:", 
 rm "$CHECK_FILE"
 ```
 
-The temporary file is private and can contain sensitive snapshot data. Agent
+`mktemp` creates this file with private permissions; there is no need to change
+the shell's umask. The temporary file can contain sensitive snapshot data. Agent
 warnings on stderr, such as an unmapped UID, are not JSON. Check that real
 users appear and the collector account's session is absent; the latter
 filtering does not apply to GPU processes. Source errors must be fixed, not
