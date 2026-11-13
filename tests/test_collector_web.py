@@ -1,4 +1,5 @@
 import json
+import re
 import threading
 from dataclasses import replace
 from datetime import timedelta
@@ -161,6 +162,8 @@ def test_dashboard_unavailable_then_fresh_and_stale(listener, monkeypatch):
     assert headers["Content-Type"] == "text/html; charset=utf-8"
     assert headers["Cache-Control"] == "no-store"
     assert "default-src 'none'" in headers["Content-Security-Policy"]
+    nonce = re.search(r"script-src 'nonce-([^']+)'", headers["Content-Security-Policy"])
+    assert nonce and f'<script nonce="{nonce.group(1)}">'.encode() in body
     assert b"Board unavailable" in body
     assert b"does not mean the VMs are free" in body
     snap = make_snapshot(

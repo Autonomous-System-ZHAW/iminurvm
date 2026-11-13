@@ -41,6 +41,7 @@
   </style>
 </head>
 <body>
+{% macro ts(value) %}<time class="ts" datetime="{{ value }}">{{ value }}</time>{% endmacro %}
 <main>
   <header class="intro">
     <div><div class="eyebrow">Shared compute / overview</div><h1>GPU Board</h1>
@@ -51,7 +52,7 @@
   <section class="info" aria-label="Board freshness">
     <strong>Board</strong>
     <span class="badge {{ board.freshness|lower }}">{{ board.freshness }}</span>
-    {% if board.generated_at %}<span class="meta"> Generated: {{ board.generated_at }} &middot; Assessed: {{ board.assessed_at }}</span>{% endif %}
+    {% if board.generated_at %}<span class="meta"> Generated: {{ ts(board.generated_at) }} &middot; Assessed: {{ ts(board.assessed_at) }}</span>{% endif %}
   </section>
   {% if board.freshness == "UNAVAILABLE" %}
     <section class="notice" role="alert"><strong>Board unavailable.</strong> The collector has not completed a successful poll. This does not mean the VMs are free. Retrying automatically.</section>
@@ -88,11 +89,11 @@
         <dt>GPU</dt><dd>{{ snap.gpu_model or "Unknown" if snap else "Unavailable" }}</dd>
         <dt>Claim</dt><dd>{% if claim %}{{ claim.owner }} &middot; {{ claim.project or "No project" }}{% elif snap %}None observed{% else %}Unavailable{% endif %}</dd>
         {% if claim %}
-          <dt>From</dt><dd>{{ claim.start }}</dd>
-          <dt>Until</dt><dd>{{ claim.end }}</dd>
+          <dt>From</dt><dd>{{ ts(claim.start) }}</dd>
+          <dt>Until</dt><dd>{{ ts(claim.end) }}</dd>
           {% if claim.message %}<dt>Message</dt><dd>{{ claim.message }}</dd>{% endif %}
         {% endif %}
-        {% if snap %}<dt>Observed</dt><dd>{{ snap.collected_at }}</dd>{% endif %}
+        {% if snap %}<dt>Observed</dt><dd>{{ ts(snap.collected_at) }}</dd>{% endif %}
       </dl>
       {% if vm.snapshot_freshness in ("STALE", "CLOCK_WARNING", "UNAVAILABLE") %}
         <p class="error"><strong>Observation {{ vm.snapshot_freshness }}.</strong> Do not assume this VM is free.</p>
@@ -129,5 +130,13 @@
   {% endif %}
   <footer>Claims are social reservations, not enforcement. Never stop another user's work without asking. Observations can lag behind local changes.</footer>
 </main>
+<script nonce="{{ nonce }}">
+  // Show timestamps in the browser's locale and time zone; ISO text stays as fallback.
+  var format = new Intl.DateTimeFormat(undefined, {dateStyle: "medium", timeStyle: "medium"});
+  document.querySelectorAll("time.ts").forEach(function (el) {
+    var date = new Date(el.getAttribute("datetime"));
+    if (!isNaN(date)) { el.title = el.textContent; el.textContent = format.format(date); }
+  });
+</script>
 </body>
 </html>

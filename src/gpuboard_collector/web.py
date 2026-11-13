@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import threading
 from functools import lru_cache
 from http import HTTPStatus
@@ -35,9 +36,9 @@ def _dashboard_template() -> Template:
     return environment.get_template("dashboard.html.j2")
 
 
-def render_dashboard(board: dict[str, Any]) -> str:
+def render_dashboard(board: dict[str, Any], nonce: str = "") -> str:
     """Render a read-only board from the same observation as the JSON endpoint."""
-    return _dashboard_template().render(board=board)
+    return _dashboard_template().render(board=board, nonce=nonce)
 
 
 class BoardStore:
@@ -104,8 +105,12 @@ def make_server(host: str, port: int, store: BoardStore) -> ThreadingHTTPServer:
             try:
                 code, data = status_response(store)
                 if self.path == "/":
+                    nonce = secrets.token_urlsafe(16)
                     self._send_body(
-                        code, render_dashboard(data).encode("utf-8"), "text/html"
+                        code,
+                        render_dashboard(data, nonce).encode("utf-8"),
+                        "text/html",
+                        nonce,
                     )
                 else:
                     self._send(code, data)
@@ -117,7 +122,14 @@ def make_server(host: str, port: int, store: BoardStore) -> ThreadingHTTPServer:
             body = json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
             self._send_body(code, body, "application/json")
 
-        def _send_body(self, code: HTTPStatus, body: bytes, content_type: str) -> None:
+        def _send_body(
+            self,
+            code: HTTPStatus,
+            body: bytes,
+            content_type: str,
+            script_nonce: str | None = None,
+        ) -> None:
+            script_src = f"script-src 'nonce-{script_nonce}'; " if script_nonce else ""
             self.send_response(code)
             self.send_header("Content-Type", f"{content_type}; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -125,7 +137,7 @@ def make_server(host: str, port: int, store: BoardStore) -> ThreadingHTTPServer:
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header(
                 "Content-Security-Policy",
-                "default-src 'none'; style-src 'unsafe-inline'; "
+                f"default-src 'none'; {script_src}style-src 'unsafe-inline'; "
                 "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             )
             self.end_headers()
