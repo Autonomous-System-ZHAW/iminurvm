@@ -4,6 +4,7 @@ import threading
 from dataclasses import replace
 from datetime import timedelta
 from http.client import HTTPConnection
+from importlib.resources import files
 from unittest.mock import Mock
 
 import pytest
@@ -106,7 +107,41 @@ def test_unknown_paths_and_methods_do_not_expose_status(listener):
     store.set_board(merge([], {}, NOW))
     assert request(port, "/missing")[0] == 404
     assert request(port, "/status.json?x=1")[0] == 404
+    assert request(port, "/static/../web.py")[0] == 404
     assert request(port, method="POST")[0] == 501
+
+
+@pytest.mark.parametrize(
+    ("path", "filename", "content_type"),
+    [
+        ("/favicon.ico", "gpu-claim-favicon.ico", "image/x-icon"),
+        ("/static/gpu-claim-favicon.ico", "gpu-claim-favicon.ico", "image/x-icon"),
+        ("/static/gpu-claim-favicon-32.png", "gpu-claim-favicon-32.png", "image/png"),
+        ("/static/gpu-claim-favicon-512.png", "gpu-claim-favicon-512.png", "image/png"),
+        (
+            "/static/gpu-claim-apple-touch-icon.png",
+            "gpu-claim-apple-touch-icon.png",
+            "image/png",
+        ),
+    ],
+)
+def test_dashboard_icons_are_served_without_board(
+    listener, path, filename, content_type
+):
+    _, port = listener
+    status, headers, body = request(port, path)
+    assert status == 200
+    assert headers["Content-Type"] == content_type
+    assert body == files("gpuboard_collector").joinpath("static", filename).read_bytes()
+
+
+def test_missing_dashboard_icon_returns_error_and_logs(listener, monkeypatch, caplog):
+    _, port = listener
+    monkeypatch.setattr(web, "files", Mock(side_effect=FileNotFoundError("missing")))
+    status, _, body = request(port, "/favicon.ico")
+    assert status == 500
+    assert json.loads(body) == {"error": "icon error"}
+    assert "Failed to load dashboard icon" in caplog.text
 
 
 def test_invalid_observation_returns_error_and_logs(listener, monkeypatch, caplog):
@@ -162,6 +197,14 @@ def test_dashboard_unavailable_then_fresh_and_stale(listener, monkeypatch):
     assert headers["Content-Type"] == "text/html; charset=utf-8"
     assert headers["Cache-Control"] == "no-store"
     assert "default-src 'none'" in headers["Content-Security-Policy"]
+    assert "img-src 'self'" in headers["Content-Security-Policy"]
+    for path in (
+        "/favicon.ico",
+        "/static/gpu-claim-favicon-32.png",
+        "/static/gpu-claim-favicon-512.png",
+        "/static/gpu-claim-apple-touch-icon.png",
+    ):
+        assert path.encode() in body
     nonce = re.search(r"script-src 'nonce-([^']+)'", headers["Content-Security-Policy"])
     assert nonce and f'<script nonce="{nonce.group(1)}">'.encode() in body
     assert b"Board unavailable" in body
@@ -225,13 +268,35 @@ def test_dashboard_separates_powered_off_vms_sorted_by_name(listener, monkeypatc
     )
     _, _, body = request(port, "/")
     text = body.decode()
-    off_start = text.index('<details class="off-section">')
+    off_start = text.index('<details class="off-section"')
     active, off = text[:off_start], text[off_start:]
     assert active.index("Alpha") < active.index("zeta")
     assert "UNREACHABLE" in active
     assert "-off" not in active
     assert off.index("alpha-off") < off.index("beta-off")
     assert "zeta" not in off
+
+
+def test_dashboard_details_have_stable_keys(listener, monkeypatch):
+    store, port = listener
+    monkeypatch.setattr(web, "now", lambda: NOW)
+    store.set_board(
+        merge(
+            [
+                VmInventory(1, "zeta", "node", True),
+                VmInventory(2, "alpha", "node", True),
+                VmInventory(3, "off", "node", False),
+            ],
+            {1: make_snapshot(), 2: make_snapshot()},
+            NOW,
+        )
+    )
+    _, _, body = request(port, "/")
+    text = body.decode()
+    assert text.index('data-detail-key="vm-2"') < text.index('data-detail-key="vm-1"')
+    assert text.count('data-detail-key="vm-1"') == 1
+    assert text.count('data-detail-key="vm-2"') == 1
+    assert text.count('data-detail-key="powered-off"') == 1
 
 
 def test_dashboard_escapes_observation_data(listener, monkeypatch):

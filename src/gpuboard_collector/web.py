@@ -9,6 +9,7 @@ import threading
 from functools import lru_cache
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib.resources import files
 from typing import Any
 
 from jinja2 import (
@@ -25,6 +26,17 @@ from gpuboard_common.serialize import BOARD_SCHEMA_VERSION, board_to_dict
 from gpuboard_common.timeutil import now
 
 logger = logging.getLogger(__name__)
+
+_ICONS = {
+    "/favicon.ico": ("gpu-claim-favicon.ico", "image/x-icon"),
+    "/static/gpu-claim-favicon.ico": ("gpu-claim-favicon.ico", "image/x-icon"),
+    "/static/gpu-claim-favicon-32.png": ("gpu-claim-favicon-32.png", "image/png"),
+    "/static/gpu-claim-favicon-512.png": ("gpu-claim-favicon-512.png", "image/png"),
+    "/static/gpu-claim-apple-touch-icon.png": (
+        "gpu-claim-apple-touch-icon.png",
+        "image/png",
+    ),
+}
 
 
 @lru_cache(maxsize=1)
@@ -99,6 +111,22 @@ def make_server(host: str, port: int, store: BoardStore) -> ThreadingHTTPServer:
             self.connection.settimeout(10)
 
         def do_GET(self) -> None:
+            if self.path in _ICONS:
+                filename, content_type = _ICONS[self.path]
+                try:
+                    body = (
+                        files("gpuboard_collector")
+                        .joinpath("static", filename)
+                        .read_bytes()
+                    )
+                except OSError:
+                    logger.exception("Failed to load dashboard icon %s", filename)
+                    self._send(
+                        HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "icon error"}
+                    )
+                    return
+                self._send_body(HTTPStatus.OK, body, content_type)
+                return
             if self.path not in ("/", "/status.json"):
                 self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
                 return
@@ -131,13 +159,16 @@ def make_server(host: str, port: int, store: BoardStore) -> ThreadingHTTPServer:
         ) -> None:
             script_src = f"script-src 'nonce-{script_nonce}'; " if script_nonce else ""
             self.send_response(code)
-            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            if content_type in ("text/html", "application/json"):
+                content_type = f"{content_type}; charset=utf-8"
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header(
                 "Content-Security-Policy",
                 f"default-src 'none'; {script_src}style-src 'unsafe-inline'; "
+                "img-src 'self'; "
                 "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             )
             self.end_headers()

@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="refresh" content="15">
   <title>GPU Board</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/gpu-claim-favicon-32.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/gpu-claim-favicon-512.png">
+  <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/gpu-claim-apple-touch-icon.png">
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0c1220; color: #e4ecf7; }
     * { box-sizing: border-box; }
@@ -100,7 +104,7 @@
       {% endif %}
       {% if vm.error %}<p class="error">Collection error: {{ vm.error }}</p>{% endif %}
       {% if snap %}
-      <details>
+      <details data-detail-key="vm-{{ vm.inventory.vmid }}">
         <summary>Sessions, GPU processes and containers</summary>
         <strong>Sessions</strong>
         {% if snap.sessions %}<ul>{% for s in snap.sessions %}<li>{{ s.user }} &middot; {{ s.kind }}{% if s.tty %} &middot; {{ s.tty }}{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">None observed</p>{% endif %}
@@ -114,7 +118,7 @@
   {% endfor %}
   </section>
   {% if off_vms %}
-  <details class="off-section">
+  <details class="off-section" data-detail-key="powered-off">
     <summary>Powered-off VMs ({{ off_vms | length }})</summary>
     <section class="grid" aria-label="Powered-off virtual machines">
     {% for vm in off_vms %}
@@ -131,6 +135,28 @@
   <footer>Claims are social reservations, not enforcement. Never stop another user's work without asking. Observations can lag behind local changes.</footer>
 </main>
 <script nonce="{{ nonce }}">
+  var openDetails = new Set();
+  var detailsStorageKey = "gpuboard-open-details";
+  try {
+    var savedDetails = JSON.parse(sessionStorage.getItem(detailsStorageKey) || "[]");
+    if (!Array.isArray(savedDetails)) { throw new Error("Invalid saved details"); }
+    openDetails = new Set(savedDetails);
+  } catch (error) {
+    console.warn("Could not restore expanded dashboard details:", error);
+  }
+  document.querySelectorAll("details[data-detail-key]").forEach(function (details) {
+    var key = details.dataset.detailKey;
+    details.open = openDetails.has(key);
+    details.addEventListener("toggle", function () {
+      if (details.open) { openDetails.add(key); } else { openDetails.delete(key); }
+      try {
+        sessionStorage.setItem(detailsStorageKey, JSON.stringify(Array.from(openDetails)));
+      } catch (error) {
+        console.warn("Could not save expanded dashboard details:", error);
+      }
+    });
+  });
+
   // Show timestamps in the browser's locale and time zone; ISO text stays as fallback.
   var format = new Intl.DateTimeFormat(undefined, {dateStyle: "medium", timeStyle: "medium"});
   document.querySelectorAll("time.ts").forEach(function (el) {

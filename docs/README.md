@@ -110,15 +110,18 @@ described below.
 ## Read-only dashboard
 
 Open `http://<collector-address>:8080/` from a machine that can reach the
-collector. The dashboard refreshes every 30 seconds and displays inventory,
+collector. The dashboard refreshes every 15 seconds and displays inventory,
 claims, activity, errors and both board and snapshot freshness. Click a VM's
-details to see sessions, GPU compute processes and running containers.
+details to see sessions, GPU compute processes and running containers. With
+JavaScript and browser session storage enabled, expanded sections stay open
+across refreshes in the same tab.
 `OFF` means Proxmox reported the VM stopped; `UNREACHABLE` means a running VM
 has no usable snapshot. A stale board makes all rows potentially outdated,
 even when an individual snapshot appears fresh. Before the first successful
 poll the page reports unavailability (HTTP 503); it is not an empty board.
 
-The page is server-rendered and requires no JavaScript. It is an MVP, not the
+The page is server-rendered and works without JavaScript, but expanded sections
+then close on refresh. It is an MVP, not the
 future modern frontend. It cannot change claims or log users in. Like the
 JSON endpoint, it has **no authentication or TLS** and is accessible to
 anyone who can reach the collector's listener. Restrict its network exposure;

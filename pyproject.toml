@@ -33,7 +33,7 @@ where = ["src"]
 include = ["gpuboard_*"]
 
 [tool.setuptools.package-data]
-gpuboard_collector = ["templates/*.j2"]
+gpuboard_collector = ["templates/*.j2", "static/*.png", "static/*.ico"]
 
 [tool.black]
 line-length = 88
