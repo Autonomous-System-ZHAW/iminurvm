@@ -192,7 +192,6 @@ def test_dashboard_unavailable_then_fresh_and_stale(listener, monkeypatch):
         "PID 12",
         "sim",
         "OFF",
-        "NOT_APPLICABLE",
         "UNREACHABLE",
         "UNAVAILABLE",
         "no address",
@@ -204,6 +203,32 @@ def test_dashboard_unavailable_then_fresh_and_stale(listener, monkeypatch):
     assert b"Board STALE" in body
     assert b"Observation STALE" in body
     assert b"CLAIMED" in body
+
+
+def test_dashboard_separates_powered_off_vms_sorted_by_name(listener, monkeypatch):
+    store, port = listener
+    monkeypatch.setattr(web, "now", lambda: NOW)
+    store.set_board(
+        merge(
+            [
+                VmInventory(1, "zeta", "node", True),
+                VmInventory(2, "beta-off", "node", False),
+                VmInventory(3, "Alpha", "node", True),
+                VmInventory(4, "alpha-off", "node", False),
+            ],
+            {1: make_snapshot(), 3: RuntimeError("no address")},
+            NOW,
+        )
+    )
+    _, _, body = request(port, "/")
+    text = body.decode()
+    off_start = text.index('<details class="off-section">')
+    active, off = text[:off_start], text[off_start:]
+    assert active.index("Alpha") < active.index("zeta")
+    assert "UNREACHABLE" in active
+    assert "-off" not in active
+    assert off.index("alpha-off") < off.index("beta-off")
+    assert "zeta" not in off
 
 
 def test_dashboard_escapes_observation_data(listener, monkeypatch):

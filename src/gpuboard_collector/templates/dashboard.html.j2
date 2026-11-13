@@ -31,6 +31,10 @@
     details { margin-top: 1rem; border-top: 1px solid #293a53; padding-top: .8rem; font-size: .9rem; }
     summary { cursor: pointer; color: #a9ccff; }
     ul { padding-left: 1.25rem; } li { margin: .35rem 0; }
+    .section-title { margin: 1.4rem 0 .8rem; }
+    .off-section { margin-top: 2rem; border-top: 1px solid #293a53; padding-top: 1rem; }
+    .off-section > summary { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+    .off-card { opacity: .65; padding: .8rem 1.1rem; }
     .error { color: #ffc1c1; }
     footer { margin-top: 2rem; color: #a7b6ca; font-size: .85rem; }
     a { color: #a9ccff; }
@@ -58,8 +62,15 @@
   {% if board.generated_at and not board.vms %}
     <p class="muted">No VMs in the collector inventory.</p>
   {% endif %}
+  {% set sorted_vms = board.vms | sort(attribute="inventory.name", case_sensitive=false) %}
+  {% set off_vms = sorted_vms | rejectattr("inventory.running") | selectattr("status", "equalto", "OFF_UNREACHABLE") | list %}
+  {% set active_vms = sorted_vms | reject("in", off_vms) | list %}
+  {% if board.vms %}
+  <h2 class="section-title">Active VMs ({{ active_vms | length }})</h2>
+  {% if not active_vms %}<p class="muted">No active VMs.</p>{% endif %}
+  {% endif %}
   <section class="grid" aria-label="GPU virtual machines">
-  {% for vm in board.vms %}
+  {% for vm in active_vms %}
     {% set snap = vm.snapshot %}
     {% set claim = snap.claim if snap else none %}
     {% if vm.status == "OFF_UNREACHABLE" %}
@@ -101,6 +112,21 @@
     </article>
   {% endfor %}
   </section>
+  {% if off_vms %}
+  <details class="off-section">
+    <summary>Powered-off VMs ({{ off_vms | length }})</summary>
+    <section class="grid" aria-label="Powered-off virtual machines">
+    {% for vm in off_vms %}
+      <article class="card off-card">
+        <div class="card-head">
+          <div><div class="eyebrow">VM {{ vm.inventory.vmid }} &middot; {{ vm.inventory.node }}</div><h2>{{ vm.inventory.name }}</h2></div>
+          <span class="badge off">OFF</span>
+        </div>
+      </article>
+    {% endfor %}
+    </section>
+  </details>
+  {% endif %}
   <footer>Claims are social reservations, not enforcement. Never stop another user's work without asking. Observations can lag behind local changes.</footer>
 </main>
 </body>
