@@ -1,5 +1,5 @@
 # Copy to /etc/gpuboard/collector.yaml
-poll_interval_seconds: 30
+poll_interval_seconds: 15
 status_path: /var/lib/gpuboard/status.json
 listen_host: 0.0.0.0  # unauthenticated HTTP on all IPv4 interfaces; restrict access
 listen_port: 8080
